@@ -30,6 +30,7 @@ type MediaAttachment struct {
 	FileName string
 	MimeType string
 	Caption  string
+	Data     []byte // raw file bytes (populated after download)
 }
 
 // InboundMessage is a normalised message from any channel.

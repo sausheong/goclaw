@@ -239,7 +239,7 @@ func TestRuntimeRun(t *testing.T) {
 		MaxTurns:  5,
 	}
 
-	events, err := rt.Run(context.Background(), "hi")
+	events, err := rt.Run(context.Background(), "hi", nil)
 	require.NoError(t, err)
 
 	var textParts []string
@@ -299,7 +299,7 @@ func TestRuntimeRunWithToolCalls(t *testing.T) {
 		MaxTurns:  5,
 	}
 
-	events, err := rt.Run(context.Background(), "read test.txt")
+	events, err := rt.Run(context.Background(), "read test.txt", nil)
 	require.NoError(t, err)
 
 	var gotToolResult bool
@@ -341,7 +341,7 @@ func TestRuntimeRunSync(t *testing.T) {
 		MaxTurns:  5,
 	}
 
-	text, err := rt.RunSync(context.Background(), "hi")
+	text, err := rt.RunSync(context.Background(), "hi", nil)
 	require.NoError(t, err)
 	assert.Equal(t, "Hello world!", text)
 }

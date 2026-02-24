@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -46,14 +47,26 @@ type Runtime struct {
 }
 
 // Run executes the agent loop for a user message, returning a channel of events.
-func (r *Runtime) Run(ctx context.Context, userMsg string) (<-chan AgentEvent, error) {
+// images is an optional slice of image attachments to include with the user message.
+func (r *Runtime) Run(ctx context.Context, userMsg string, images []llm.ImageContent) (<-chan AgentEvent, error) {
 	events := make(chan AgentEvent, 100)
 
 	go func() {
 		defer close(events)
 
-		// Append user message to session
-		r.Session.Append(session.UserMessageEntry(userMsg))
+		// Append user message to session (with optional images)
+		if len(images) > 0 {
+			var imgData []session.ImageData
+			for _, img := range images {
+				imgData = append(imgData, session.ImageData{
+					MimeType: img.MimeType,
+					Data:     base64.StdEncoding.EncodeToString(img.Data),
+				})
+			}
+			r.Session.Append(session.UserMessageWithImagesEntry(userMsg, imgData))
+		} else {
+			r.Session.Append(session.UserMessageEntry(userMsg))
+		}
 
 		maxTurns := r.MaxTurns
 		if maxTurns == 0 {
@@ -175,8 +188,8 @@ func (r *Runtime) Run(ctx context.Context, userMsg string) (<-chan AgentEvent, e
 }
 
 // RunSync is a convenience method that runs the agent and collects the full text response.
-func (r *Runtime) RunSync(ctx context.Context, userMsg string) (string, error) {
-	events, err := r.Run(ctx, userMsg)
+func (r *Runtime) RunSync(ctx context.Context, userMsg string, images []llm.ImageContent) (string, error) {
+	events, err := r.Run(ctx, userMsg, images)
 	if err != nil {
 		return "", err
 	}

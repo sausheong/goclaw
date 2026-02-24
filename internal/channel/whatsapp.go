@@ -251,11 +251,24 @@ func (w *WhatsAppChannel) handleMessage(evt *events.Message) {
 	// Extract media attachments
 	var media []MediaAttachment
 	if img := evt.Message.GetImageMessage(); img != nil {
-		media = append(media, MediaAttachment{
+		att := MediaAttachment{
 			Type:     "photo",
 			MimeType: img.GetMimetype(),
 			Caption:  img.GetCaption(),
-		})
+		}
+		// Download image bytes so they can be sent to the LLM
+		w.mu.Lock()
+		client := w.client
+		w.mu.Unlock()
+		if client != nil {
+			data, err := client.Download(context.Background(), img)
+			if err != nil {
+				slog.Warn("whatsapp image download failed", "error", err)
+			} else {
+				att.Data = data
+			}
+		}
+		media = append(media, att)
 	}
 	if doc := evt.Message.GetDocumentMessage(); doc != nil {
 		media = append(media, MediaAttachment{

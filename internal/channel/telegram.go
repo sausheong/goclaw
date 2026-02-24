@@ -3,7 +3,9 @@ package channel
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -249,6 +251,21 @@ func (t *TelegramChannel) defaultHandler(ctx context.Context, b *bot.Bot, update
 		})
 	}
 
+	// Download photo data so it can be sent to the LLM
+	for i := range media {
+		if media[i].Type == "photo" && media[i].FileID != "" {
+			data, mimeType, err := t.downloadFile(ctx, b, media[i].FileID)
+			if err != nil {
+				slog.Warn("telegram photo download failed", "error", err, "file_id", media[i].FileID)
+				continue
+			}
+			media[i].Data = data
+			if media[i].MimeType == "" {
+				media[i].MimeType = mimeType
+			}
+		}
+	}
+
 	t.inbound <- InboundMessage{
 		Channel:    "telegram",
 		AccountID:  strconv.FormatInt(msg.Chat.ID, 10), // chat ID for replying
@@ -258,6 +275,65 @@ func (t *TelegramChannel) defaultHandler(ctx context.Context, b *bot.Bot, update
 		Text:       text,
 		Media:      media,
 		Timestamp:  time.Unix(int64(msg.Date), 0),
+	}
+}
+
+const maxImageSize = 10 * 1024 * 1024 // 10MB
+
+// downloadFile downloads a file from Telegram by file ID.
+// Returns the file bytes and detected MIME type.
+func (t *TelegramChannel) downloadFile(ctx context.Context, b *bot.Bot, fileID string) ([]byte, string, error) {
+	file, err := b.GetFile(ctx, &bot.GetFileParams{FileID: fileID})
+	if err != nil {
+		return nil, "", fmt.Errorf("get file: %w", err)
+	}
+
+	if file.FileSize > maxImageSize {
+		return nil, "", fmt.Errorf("file too large: %d bytes", file.FileSize)
+	}
+
+	url := b.FileDownloadLink(file)
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, "", fmt.Errorf("download file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", fmt.Errorf("download file: status %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxImageSize+1))
+	if err != nil {
+		return nil, "", fmt.Errorf("read file: %w", err)
+	}
+	if int64(len(data)) > maxImageSize {
+		return nil, "", fmt.Errorf("file too large: exceeded %d bytes", maxImageSize)
+	}
+
+	// Detect MIME type from Content-Type header or file path
+	mimeType := resp.Header.Get("Content-Type")
+	if mimeType == "" || mimeType == "application/octet-stream" {
+		mimeType = detectImageMIME(file.FilePath)
+	}
+
+	return data, mimeType, nil
+}
+
+// detectImageMIME guesses MIME type from a file path extension.
+func detectImageMIME(path string) string {
+	lower := strings.ToLower(path)
+	switch {
+	case strings.HasSuffix(lower, ".jpg"), strings.HasSuffix(lower, ".jpeg"):
+		return "image/jpeg"
+	case strings.HasSuffix(lower, ".png"):
+		return "image/png"
+	case strings.HasSuffix(lower, ".gif"):
+		return "image/gif"
+	case strings.HasSuffix(lower, ".webp"):
+		return "image/webp"
+	default:
+		return "image/jpeg" // Telegram photos are typically JPEG
 	}
 }
 

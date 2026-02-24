@@ -2,8 +2,10 @@ package llm
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 
 	openai "github.com/sashabaranov/go-openai"
@@ -52,6 +54,29 @@ func (p *OpenAIProvider) ChatStream(ctx context.Context, req ChatRequest) (<-cha
 					Role:       openai.ChatMessageRoleTool,
 					Content:    m.Content,
 					ToolCallID: m.ToolCallID,
+				})
+			} else if len(m.Images) > 0 {
+				var parts []openai.ChatMessagePart
+				for _, img := range m.Images {
+					encoded := base64.StdEncoding.EncodeToString(img.Data)
+					dataURI := fmt.Sprintf("data:%s;base64,%s", img.MimeType, encoded)
+					parts = append(parts, openai.ChatMessagePart{
+						Type: openai.ChatMessagePartTypeImageURL,
+						ImageURL: &openai.ChatMessageImageURL{
+							URL:    dataURI,
+							Detail: openai.ImageURLDetailAuto,
+						},
+					})
+				}
+				if m.Content != "" {
+					parts = append(parts, openai.ChatMessagePart{
+						Type: openai.ChatMessagePartTypeText,
+						Text: m.Content,
+					})
+				}
+				msgs = append(msgs, openai.ChatCompletionMessage{
+					Role:         openai.ChatMessageRoleUser,
+					MultiContent: parts,
 				})
 			} else {
 				msgs = append(msgs, openai.ChatCompletionMessage{

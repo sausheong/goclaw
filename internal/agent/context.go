@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -64,10 +65,24 @@ func assembleMessages(history []session.SessionEntry) []llm.Message {
 			// Before appending a new message, check if the last assistant
 			// message has orphaned tool calls that need synthetic results.
 			msgs = injectMissingToolResults(msgs)
-			msgs = append(msgs, llm.Message{
+			msg := llm.Message{
 				Role:    entry.Role,
 				Content: md.Text,
-			})
+			}
+			// Convert session images to LLM image content
+			if entry.Role == "user" {
+				for _, img := range md.Images {
+					data, err := base64.StdEncoding.DecodeString(img.Data)
+					if err != nil {
+						continue
+					}
+					msg.Images = append(msg.Images, llm.ImageContent{
+						MimeType: img.MimeType,
+						Data:     data,
+					})
+				}
+			}
+			msgs = append(msgs, msg)
 
 		case session.EntryTypeToolCall:
 			var td session.ToolCallData

@@ -245,7 +245,18 @@ func (cm *ChannelManager) handleMessage(ctx context.Context, ch channel.Channel,
 		"model", agentCfg.Model,
 	)
 
-	events, err := rt.Run(ctx, msg.Text)
+	// Convert downloaded media attachments to LLM image content
+	var images []llm.ImageContent
+	for _, m := range msg.Media {
+		if len(m.Data) > 0 && m.MimeType != "" {
+			images = append(images, llm.ImageContent{
+				MimeType: m.MimeType,
+				Data:     m.Data,
+			})
+		}
+	}
+
+	events, err := rt.Run(ctx, msg.Text, images)
 	if err != nil {
 		slog.Error("agent run error", "error", err, "agent", agentID)
 		sendErr := ch.Send(ctx, channel.OutboundMessage{

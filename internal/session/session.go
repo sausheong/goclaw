@@ -28,9 +28,16 @@ type SessionEntry struct {
 	Data      json.RawMessage `json:"data"`
 }
 
+// ImageData holds a base64-encoded image for session persistence.
+type ImageData struct {
+	MimeType string `json:"mime_type"`
+	Data     string `json:"data"` // base64-encoded
+}
+
 // MessageData holds text message content.
 type MessageData struct {
-	Text string `json:"text"`
+	Text   string      `json:"text"`
+	Images []ImageData `json:"images,omitempty"`
 }
 
 // ToolCallData holds a tool call's details.
@@ -213,6 +220,16 @@ func (s *Session) SetStore(store *Store) {
 // UserMessageEntry creates a user message entry.
 func UserMessageEntry(text string) SessionEntry {
 	data, _ := json.Marshal(MessageData{Text: text})
+	return SessionEntry{
+		Type: EntryTypeMessage,
+		Role: "user",
+		Data: data,
+	}
+}
+
+// UserMessageWithImagesEntry creates a user message entry with image attachments.
+func UserMessageWithImagesEntry(text string, images []ImageData) SessionEntry {
+	data, _ := json.Marshal(MessageData{Text: text, Images: images})
 	return SessionEntry{
 		Type: EntryTypeMessage,
 		Role: "user",

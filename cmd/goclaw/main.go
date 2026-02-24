@@ -316,7 +316,7 @@ func runStart(configPath string) error {
 					Skills:    skillLoader,
 					Memory:    memMgr,
 				}
-				return rt.RunSync(ctx, prompt)
+				return rt.RunSync(ctx, prompt, nil)
 			}
 
 			daemon := heartbeat.NewDaemon(agentCfg.Workspace, interval, agentFn)
@@ -354,7 +354,7 @@ func runStart(configPath string) error {
 					Skills:    skillLoader,
 					Memory:    memMgr,
 				}
-				return rt.RunSync(ctx, prompt)
+				return rt.RunSync(ctx, prompt, nil)
 			}
 
 			cronScheduler.Add(cron.Job{
@@ -394,7 +394,7 @@ func runStart(configPath string) error {
 					Skills:    skillLoader,
 					Memory:    memMgr,
 				}
-				return rt.RunSync(ctx, prompt)
+				return rt.RunSync(ctx, prompt, nil)
 			}
 		},
 	})
@@ -534,7 +534,7 @@ func runChat(agentID, configPath, modelOverride string) error {
 				Skills:    skillLoader,
 				Memory:    memMgr,
 			}
-			return cronRT.RunSync(ctx, prompt)
+			return cronRT.RunSync(ctx, prompt, nil)
 		}
 	}
 
@@ -617,7 +617,13 @@ func runChat(agentID, configPath, modelOverride string) error {
 			return nil
 		}
 
-		events, err := rt.Run(ctx, input)
+		// Extract image paths from input (supports drag-and-drop)
+		text, images := extractImagesFromInput(input)
+		if len(images) > 0 {
+			fmt.Printf("\033[90m[attached %d image(s)]\033[0m\n", len(images))
+		}
+
+		events, err := rt.Run(ctx, text, images)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			continue
@@ -649,6 +655,137 @@ func runChat(agentID, configPath, modelOverride string) error {
 			}
 		}
 	}
+}
+
+// imageExtensions is the set of file extensions treated as images.
+var imageExtensions = map[string]string{
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".png":  "image/png",
+	".gif":  "image/gif",
+	".webp": "image/webp",
+	".bmp":  "image/bmp",
+}
+
+// extractImagesFromInput scans the input line for image file paths,
+// reads them, and returns the cleaned text plus image contents.
+// Supports:
+//   - bare paths:        /path/to/image.png
+//   - single-quoted paths (drag-and-drop on macOS): '/path/to/my image.png'
+//   - backslash-escaped spaces: /path/to/my\ image.png
+//   - tilde home dir:    ~/Downloads/image.png
+func extractImagesFromInput(input string) (string, []llm.ImageContent) {
+	var images []llm.ImageContent
+	cleaned := input
+
+	// Pass 1: extract single-quoted paths (drag-and-drop with spaces)
+	for {
+		start := strings.Index(cleaned, "'")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(cleaned[start+1:], "'")
+		if end == -1 {
+			break
+		}
+		end += start + 1 // absolute index of closing quote
+
+		quoted := cleaned[start+1 : end]
+		path := expandHome(quoted)
+
+		if img, ok := tryReadImage(path); ok {
+			images = append(images, img)
+			// Remove the quoted path from the text
+			cleaned = strings.TrimSpace(cleaned[:start] + cleaned[end+1:])
+			continue
+		}
+		// Not an image, skip past this quoted section to avoid infinite loop
+		break
+	}
+
+	// Pass 2: extract bare paths and paths with backslash-escaped spaces
+	words := splitRespectingEscapes(cleaned)
+	var remaining []string
+	for _, word := range words {
+		// Unescape backslash-spaces
+		unescaped := strings.ReplaceAll(word, "\\ ", " ")
+		path := expandHome(unescaped)
+
+		if img, ok := tryReadImage(path); ok {
+			images = append(images, img)
+			continue
+		}
+		remaining = append(remaining, word)
+	}
+
+	text := strings.Join(remaining, " ")
+	if text == "" && len(images) > 0 {
+		text = "What's in this image?"
+	}
+	return text, images
+}
+
+// tryReadImage checks if a path points to a readable image file and returns its content.
+func tryReadImage(path string) (llm.ImageContent, bool) {
+	ext := strings.ToLower(filepath.Ext(path))
+	mimeType, isImage := imageExtensions[ext]
+	if !isImage {
+		return llm.ImageContent{}, false
+	}
+
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return llm.ImageContent{}, false
+	}
+
+	// Limit to 10MB
+	if info.Size() > 10*1024*1024 {
+		slog.Warn("image too large, skipping", "path", path, "size", info.Size())
+		return llm.ImageContent{}, false
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		slog.Warn("failed to read image", "path", path, "error", err)
+		return llm.ImageContent{}, false
+	}
+
+	return llm.ImageContent{MimeType: mimeType, Data: data}, true
+}
+
+// expandHome expands a leading ~ to the user's home directory.
+func expandHome(path string) string {
+	if strings.HasPrefix(path, "~/") {
+		if home, err := os.UserHomeDir(); err == nil {
+			return filepath.Join(home, path[2:])
+		}
+	}
+	return path
+}
+
+// splitRespectingEscapes splits a string on spaces, but treats "\ " as a literal space
+// within the same token (for drag-and-drop paths with escaped spaces).
+func splitRespectingEscapes(s string) []string {
+	var tokens []string
+	var current strings.Builder
+	runes := []rune(s)
+	for i := 0; i < len(runes); i++ {
+		if runes[i] == '\\' && i+1 < len(runes) && runes[i+1] == ' ' {
+			current.WriteString("\\ ")
+			i++ // skip the space
+		} else if runes[i] == ' ' {
+			if current.Len() > 0 {
+				tokens = append(tokens, current.String())
+				current.Reset()
+			}
+		} else {
+			current.WriteRune(runes[i])
+		}
+	}
+	if current.Len() > 0 {
+		tokens = append(tokens, current.String())
+	}
+	return tokens
 }
 
 func runStatus() error {

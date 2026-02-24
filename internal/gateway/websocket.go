@@ -192,7 +192,7 @@ func (h *WebSocketHandler) handleChatSend(conn *websocket.Conn, req JSONRPCReque
 		Workspace: agentCfg.Workspace,
 	}
 
-	events, err := rt.Run(context.Background(), params.Text)
+	events, err := rt.Run(context.Background(), params.Text, nil)
 	if err != nil {
 		writeJSON(conn, JSONRPCResponse{
 			JSONRPC: "2.0",

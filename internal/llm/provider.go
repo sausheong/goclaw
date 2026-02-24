@@ -19,13 +19,20 @@ const (
 	EventError
 )
 
+// ImageContent holds image data for multimodal messages.
+type ImageContent struct {
+	MimeType string // "image/jpeg", "image/png", etc.
+	Data     []byte // raw image bytes
+}
+
 // Message represents a conversation message.
 type Message struct {
-	Role       string     `json:"role"` // "user", "assistant", "system"
-	Content    string     `json:"content,omitempty"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"` // for tool results
-	IsError    bool       `json:"is_error,omitempty"`     // for tool results
+	Role       string         `json:"role"` // "user", "assistant", "system"
+	Content    string         `json:"content,omitempty"`
+	Images     []ImageContent `json:"-"`                      // image attachments (not serialized)
+	ToolCalls  []ToolCall     `json:"tool_calls,omitempty"`
+	ToolCallID string         `json:"tool_call_id,omitempty"` // for tool results
+	IsError    bool           `json:"is_error,omitempty"`     // for tool results
 }
 
 // ToolCall represents a tool invocation requested by the LLM.

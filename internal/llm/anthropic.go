@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"log/slog"
 
@@ -44,6 +45,16 @@ func (p *AnthropicProvider) ChatStream(ctx context.Context, req ChatRequest) (<-
 				msgs = append(msgs, anthropic.NewUserMessage(
 					anthropic.NewToolResultBlock(m.ToolCallID, m.Content, m.IsError),
 				))
+			} else if len(m.Images) > 0 {
+				var blocks []anthropic.ContentBlockParamUnion
+				for _, img := range m.Images {
+					encoded := base64.StdEncoding.EncodeToString(img.Data)
+					blocks = append(blocks, anthropic.NewImageBlockBase64(img.MimeType, encoded))
+				}
+				if m.Content != "" {
+					blocks = append(blocks, anthropic.NewTextBlock(m.Content))
+				}
+				msgs = append(msgs, anthropic.NewUserMessage(blocks...))
 			} else {
 				msgs = append(msgs, anthropic.NewUserMessage(anthropic.NewTextBlock(m.Content)))
 			}

@@ -16,6 +16,7 @@ GoClaw connects messaging channels (Telegram, WhatsApp, CLI) to LLMs (Claude, GP
 - **Skill system** — Markdown files with YAML frontmatter, selectively injected per-turn based on relevance
 - **Heartbeat daemon** — proactive agent actions on a schedule via HEARTBEAT.md checklists
 - **Cron jobs** — recurring prompts on configurable intervals
+- **Vision/image support** — send photos via Telegram, WhatsApp, or CLI and the LLM describes/analyzes them
 - **Tool policies** — per-agent allow/deny lists for all nine tools
 - **Session persistence** — append-only JSONL files with DAG structure and branching
 - **Config hot-reload** — edit goclaw.json5 while running, changes apply immediately
@@ -188,15 +189,15 @@ type Tool interface {
 
 ### Telegram
 
-Uses the Telegram Bot API. Create a bot via [@BotFather](https://t.me/BotFather), add the token to your config, and start the gateway. Supports polling and webhook modes, group chats with mention-only mode, and media attachments.
+Uses the Telegram Bot API. Create a bot via [@BotFather](https://t.me/BotFather), add the token to your config, and start the gateway. Supports polling and webhook modes, group chats with mention-only mode, and image vision (send a photo and the LLM will describe it).
 
 ### WhatsApp
 
-Uses the WhatsApp Web multidevice protocol via [whatsmeow](https://github.com/tulir/whatsmeow). No Meta Business account, no webhooks, no public URL needed. QR code authentication on first connect, credentials persisted in SQLite for automatic reconnection.
+Uses the WhatsApp Web multidevice protocol via [whatsmeow](https://github.com/tulir/whatsmeow). No Meta Business account, no webhooks, no public URL needed. QR code authentication on first connect, credentials persisted in SQLite for automatic reconnection. Supports image vision — send a photo and the LLM will analyze it.
 
 ### CLI
 
-Interactive terminal chat with Markdown rendering. Available via `goclaw chat` without starting the full gateway.
+Interactive terminal chat with Markdown rendering. Available via `goclaw chat` without starting the full gateway. Supports image input — paste or drag-and-drop a file path to send images to the LLM for vision analysis.
 
 ---
 

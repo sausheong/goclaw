@@ -8,6 +8,7 @@ GoClaw is a self-hosted AI agent gateway. It runs as a single binary on your mac
 - [CLI Commands](#cli-commands)
 - [Configuration](#configuration)
 - [Messaging Channels](#messaging-channels)
+- [Image / Vision Support](#image--vision-support)
 - [Multiple Agents](#multiple-agents)
 - [Message Routing](#message-routing)
 - [Skills](#skills)
@@ -82,11 +83,12 @@ Inside a `goclaw chat` session:
 
 ```
 > Hello, what files are in this directory?
+> Describe this image ~/Downloads/photo.png
 > /quit
 > /exit
 ```
 
-The agent can read files, write files, edit files, run shell commands, fetch web pages, and search the web — all on your local machine.
+The agent can read files, write files, edit files, run shell commands, fetch web pages, and search the web — all on your local machine. You can also send images for vision analysis (see [Image / Vision Support](#image--vision-support)).
 
 ---
 
@@ -186,6 +188,8 @@ Connect a Telegram bot so you can chat with your agent from your phone.
 
 **Group chats:** By default, the bot only responds in groups when mentioned (`@yourbotname`). This is controlled by the `security.groupPolicy.requireMention` setting.
 
+**Image support:** Send a photo to the bot (with or without a caption) and the LLM will analyze it. Photos under 10MB are automatically downloaded and passed to the model for vision analysis.
+
 ### WhatsApp
 
 Connect your personal WhatsApp account via the Web multidevice protocol. No Meta Business account or public URL needed — everything runs locally.
@@ -216,6 +220,77 @@ Connect your personal WhatsApp account via the Web multidevice protocol. No Meta
 After the initial pairing, credentials are stored in the SQLite database and reconnection is automatic on subsequent starts.
 
 **Group chats:** In WhatsApp groups, the sender's JID identifies who sent the message, while the group JID is used for replying.
+
+**Image support:** Send a photo to the bot and the LLM will describe and analyze it. Image bytes are downloaded automatically via the WhatsApp protocol.
+
+---
+
+## Image / Vision Support
+
+GoClaw supports sending images to vision-capable LLMs (Claude, GPT-4o, etc.) across all three channels. The LLM sees the actual image pixels — not just metadata.
+
+### How it works
+
+1. **You send an image** via Telegram, WhatsApp, or CLI
+2. **GoClaw downloads the image bytes** (from Telegram's API, WhatsApp's protocol, or the local filesystem)
+3. **The image is passed to the LLM** as a multipart content block alongside your text
+4. **The LLM responds** with a description, analysis, or answer about the image
+5. **Images are persisted** in the session history (base64-encoded in JSONL) so the LLM can reference them in follow-up messages
+
+### CLI
+
+In `goclaw chat`, include an image file path in your message. GoClaw detects image paths, reads the file, and sends the bytes to the LLM.
+
+**Supported input formats:**
+
+```bash
+# Bare path
+> What's in this image? /Users/me/photo.png
+
+# Tilde expansion
+> Describe ~/Downloads/screenshot.jpg
+
+# Drag-and-drop from Finder (macOS pastes a quoted path)
+> Tell me about this '/Users/me/My Photos/vacation.png'
+
+# Drag-and-drop with escaped spaces
+> Analyze /Users/me/My\ Photos/vacation.png
+
+# Image path only (defaults to "What's in this image?")
+> ~/Downloads/photo.jpg
+```
+
+**Supported image formats:** `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.bmp` (max 10MB)
+
+### Telegram
+
+Send a photo to your bot — with or without a caption. The bot downloads the photo from Telegram's servers and passes it to the LLM.
+
+```
+[Send photo with caption: "What breed is this dog?"]
+Agent: That looks like a Golden Retriever! It has the characteristic...
+```
+
+### WhatsApp
+
+Send an image message to the bot. The image is downloaded via the WhatsApp protocol and sent to the LLM.
+
+```
+[Send image with caption: "Can you read the text in this screenshot?"]
+Agent: The screenshot shows a terminal with the following output...
+```
+
+### Supported LLM providers
+
+Image/vision support works with providers that support multimodal input:
+
+| Provider | Vision support |
+|----------|---------------|
+| Anthropic (Claude) | Yes — uses `image` content blocks |
+| OpenAI (GPT-4o, etc.) | Yes — uses `image_url` with data URIs |
+| Ollama | Depends on the model (e.g., `llava`, `bakllava`) |
+
+If the model doesn't support vision, it will typically ignore the image or return an error.
 
 ---
 

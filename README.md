@@ -16,7 +16,7 @@ GoClaw connects messaging channels (Telegram, WhatsApp, CLI) to LLMs (Claude, GP
 - **Skill system** — Markdown files with YAML frontmatter, selectively injected per-turn based on relevance
 - **Heartbeat daemon** — proactive agent actions on a schedule via HEARTBEAT.md checklists
 - **Cron jobs** — recurring prompts on configurable intervals
-- **Tool policies** — per-agent allow/deny lists for read_file, write_file, edit_file, bash, web_fetch, web_search
+- **Tool policies** — per-agent allow/deny lists for all nine tools
 - **Session persistence** — append-only JSONL files with DAG structure and branching
 - **Config hot-reload** — edit goclaw.json5 while running, changes apply immediately
 - **WebSocket API** — JSON-RPC 2.0 control plane for programmatic access
@@ -221,7 +221,7 @@ All configuration lives in `~/.goclaw/goclaw.json5` (JSON5 format for comments a
         "model": "anthropic/claude-sonnet-4-5-20250514",
         "workspace": "~/.goclaw/workspace-default",
         "tools": {
-          "allow": ["read_file", "write_file", "edit_file", "bash", "web_fetch", "web_search"]
+          "allow": ["read_file", "write_file", "edit_file", "bash", "web_fetch", "web_search", "browser", "send_message", "cron"]
         }
       }
     ]
@@ -362,10 +362,10 @@ Per-package test coverage:
 |---------|----------|
 | `internal/memory` | 89.2% |
 | `internal/heartbeat` | 88.6% |
-| `internal/cron` | 87.9% |
 | `internal/skill` | 86.6% |
+| `internal/cron` | 85.7% |
 | `internal/session` | 84.6% |
-| `internal/agent` | 79.2% |
+| `internal/agent` | 82.1% |
 | `internal/router` | 77.8% |
 | `internal/config` | 73.9% |
 | `internal/gateway` | 56.8% |

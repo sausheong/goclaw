@@ -118,6 +118,50 @@ func TestAssembleMessagesEmpty(t *testing.T) {
 	assert.Nil(t, msgs)
 }
 
+func TestAssembleMessagesOrphanedToolCall(t *testing.T) {
+	// Simulate an interrupted session: tool_call without tool_result, followed by a new user message
+	tc := session.ToolCallEntry("tc_orphan", "bash", json.RawMessage(`{"command":"pwd"}`))
+
+	history := []session.SessionEntry{
+		session.UserMessageEntry("run pwd"),
+		tc,
+		session.UserMessageEntry("hello again"),
+	}
+
+	msgs := assembleMessages(history)
+
+	// Should have: user, assistant(tool_call), synthetic tool_result, user
+	require.Len(t, msgs, 4)
+	assert.Equal(t, "user", msgs[0].Role)
+	assert.Equal(t, "assistant", msgs[1].Role)
+	require.Len(t, msgs[1].ToolCalls, 1)
+	// Synthetic result injected
+	assert.Equal(t, "user", msgs[2].Role)
+	assert.Equal(t, "tc_orphan", msgs[2].ToolCallID)
+	assert.True(t, msgs[2].IsError)
+	assert.Contains(t, msgs[2].Content, "interrupted")
+	// New user message
+	assert.Equal(t, "user", msgs[3].Role)
+	assert.Equal(t, "hello again", msgs[3].Content)
+}
+
+func TestAssembleMessagesOrphanedToolCallAtEnd(t *testing.T) {
+	// Tool call at end of history with no result and no following message
+	tc := session.ToolCallEntry("tc_end", "bash", json.RawMessage(`{"command":"ls"}`))
+
+	history := []session.SessionEntry{
+		session.UserMessageEntry("list files"),
+		tc,
+	}
+
+	msgs := assembleMessages(history)
+
+	// Should have: user, assistant(tool_call), synthetic tool_result
+	require.Len(t, msgs, 3)
+	assert.Equal(t, "tc_end", msgs[2].ToolCallID)
+	assert.True(t, msgs[2].IsError)
+}
+
 // --- pruneToolResults tests ---
 
 func TestPruneToolResults(t *testing.T) {

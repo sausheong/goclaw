@@ -365,8 +365,39 @@ func runStart(configPath string) error {
 			})
 		}
 	}
-	// Register cron tool so the agent can dynamically schedule jobs
-	tools.RegisterCron(toolReg, &cronSchedulerAdapter{scheduler: cronScheduler, ctx: ctx})
+	// Register cron tool so the agent can dynamically schedule jobs.
+	// The agentFactory creates a real agent runtime for each dynamic job.
+	tools.RegisterCron(toolReg, &cronSchedulerAdapter{
+		scheduler: cronScheduler,
+		ctx:       ctx,
+		agentFactory: func(jobName string) func(context.Context, string) (string, error) {
+			return func(ctx context.Context, prompt string) (string, error) {
+				// Use the default agent for dynamic cron jobs
+				defaultCfg := cfg.Agents.List[0]
+				pName, mName := llm.ParseProviderModel(defaultCfg.Model)
+				p, ok := providers[pName]
+				if !ok {
+					return "", fmt.Errorf("provider %q not available", pName)
+				}
+				cronSess, err := sessionStore.Load(defaultCfg.ID, "cron_"+jobName)
+				if err != nil {
+					return "", err
+				}
+				cronToolReg := tools.NewRegistry()
+				tools.RegisterCoreTools(cronToolReg, defaultCfg.Workspace)
+				rt := &agent.Runtime{
+					LLM:       p,
+					Tools:     cronToolReg,
+					Session:   cronSess,
+					Model:     mName,
+					Workspace: defaultCfg.Workspace,
+					Skills:    skillLoader,
+					Memory:    memMgr,
+				}
+				return rt.RunSync(ctx, prompt)
+			}
+		},
+	})
 
 	if len(cronScheduler.Jobs()) > 0 {
 		cronScheduler.Start(ctx)
@@ -450,10 +481,6 @@ func runChat(agentID, configPath, modelOverride string) error {
 		return fmt.Errorf("create LLM provider: %w", err)
 	}
 
-	// Init tools
-	toolReg := tools.NewRegistry()
-	tools.RegisterCoreTools(toolReg, agentCfg.Workspace)
-
 	// Init session
 	dataDir := config.DefaultDataDir()
 	os.MkdirAll(filepath.Join(dataDir, "sessions"), 0o755)
@@ -480,9 +507,78 @@ func runChat(agentID, configPath, modelOverride string) error {
 	// Ensure workspace exists
 	os.MkdirAll(agentCfg.Workspace, 0o755)
 
+	// Init tools
+	toolReg := tools.NewRegistry()
+	tools.RegisterCoreTools(toolReg, agentCfg.Workspace)
+
+	// Init cron scheduler for chat mode so the agent can use the cron tool
+	ctx := context.Background()
+	cronScheduler := cron.NewScheduler()
+
+	// Build an agent factory for dynamic cron jobs — each job gets its own
+	// session and runtime so it can actually execute the prompt via the LLM.
+	agentFactory := func(jobName string) func(context.Context, string) (string, error) {
+		return func(ctx context.Context, prompt string) (string, error) {
+			cronSess, err := sessionStore.Load(agentID, "cron_"+jobName)
+			if err != nil {
+				return "", err
+			}
+			cronToolReg := tools.NewRegistry()
+			tools.RegisterCoreTools(cronToolReg, agentCfg.Workspace)
+			cronRT := &agent.Runtime{
+				LLM:       provider,
+				Tools:     cronToolReg,
+				Session:   cronSess,
+				Model:     modelName,
+				Workspace: agentCfg.Workspace,
+				Skills:    skillLoader,
+				Memory:    memMgr,
+			}
+			return cronRT.RunSync(ctx, prompt)
+		}
+	}
+
+	// Register static cron jobs from config
+	for _, cronJob := range agentCfg.Cron {
+		jobPrompt := cronJob.Prompt
+		jobName := cronJob.Name
+		cronScheduler.Add(cron.Job{
+			Name:     cronJob.Name,
+			Schedule: cronJob.Schedule,
+			Prompt:   jobPrompt,
+			AgentFn:  agentFactory(jobName),
+		})
+	}
+
+	// Register cron tool so the agent can dynamically schedule jobs.
+	// In chat mode, print cron job results to the terminal.
+	tools.RegisterCron(toolReg, &cronSchedulerAdapter{
+		scheduler:    cronScheduler,
+		ctx:          ctx,
+		agentFactory: agentFactory,
+		outputFn: func(jobName, response string) {
+			fmt.Printf("\n[cron: %s]\n%s\n\n> ", jobName, response)
+		},
+	})
+
+	// Apply tool policy from agent config
+	policy := tools.Policy{
+		Allow: agentCfg.Tools.Allow,
+		Deny:  agentCfg.Tools.Deny,
+	}
+	var toolExecutor tools.Executor = toolReg
+	if len(policy.Allow) > 0 || len(policy.Deny) > 0 {
+		toolExecutor = tools.NewFilteredRegistry(toolReg, policy)
+	}
+
+	// Start cron scheduler if there are any static jobs
+	if len(cronScheduler.Jobs()) > 0 {
+		cronScheduler.Start(ctx)
+	}
+
 	rt := &agent.Runtime{
 		LLM:       provider,
-		Tools:     toolReg,
+		Tools:     toolExecutor,
 		Session:   sess,
 		Model:     modelName,
 		Workspace: agentCfg.Workspace,
@@ -495,7 +591,6 @@ func runChat(agentID, configPath, modelOverride string) error {
 	fmt.Println()
 
 	// Interactive REPL
-	ctx := context.Background()
 
 	for {
 		fmt.Print("> ")
@@ -1055,19 +1150,29 @@ func runDoctor(configPath string) error {
 
 // cronSchedulerAdapter adapts cron.Scheduler to the tools.JobScheduler interface.
 type cronSchedulerAdapter struct {
-	scheduler *cron.Scheduler
-	ctx       context.Context
+	scheduler    *cron.Scheduler
+	ctx          context.Context
+	agentFactory func(name string) func(context.Context, string) (string, error) // creates an AgentFn for dynamic jobs
+	outputFn     cron.OutputFunc                                                  // optional: called with results
 }
 
 func (a *cronSchedulerAdapter) AddJob(name, schedule, prompt string) error {
+	var agentFn func(context.Context, string) (string, error)
+	if a.agentFactory != nil {
+		agentFn = a.agentFactory(name)
+	} else {
+		agentFn = func(ctx context.Context, p string) (string, error) {
+			slog.Info("dynamic cron job executed (no agent)", "name", name)
+			return "OK", nil
+		}
+	}
+
 	err := a.scheduler.Add(cron.Job{
 		Name:     name,
 		Schedule: schedule,
 		Prompt:   prompt,
-		AgentFn: func(ctx context.Context, p string) (string, error) {
-			slog.Info("dynamic cron job executed", "name", name)
-			return "OK", nil
-		},
+		AgentFn:  agentFn,
+		OutputFn: a.outputFn,
 	})
 	if err != nil {
 		return err

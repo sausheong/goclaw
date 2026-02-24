@@ -10,12 +10,17 @@ import (
 // AgentFunc is a function that sends a prompt to an agent and returns its response.
 type AgentFunc func(ctx context.Context, prompt string) (string, error)
 
+// OutputFunc is called with the agent response when a cron job completes.
+// It can be used to display results (e.g. print to terminal in chat mode).
+type OutputFunc func(jobName, response string)
+
 // Job represents a scheduled task.
 type Job struct {
 	Name     string
 	Schedule string        // cron-like: "30m", "1h", "24h", or time.Duration parseable string
 	Prompt   string        // prompt to send to the agent
 	AgentFn  AgentFunc
+	OutputFn OutputFunc    // optional: called with the response when the job completes
 	interval time.Duration // parsed interval
 }
 
@@ -89,6 +94,9 @@ func (s *Scheduler) runJob(ctx context.Context, job Job) {
 			}
 
 			slog.Info("cron job completed", "name", job.Name, "response_length", len(response))
+			if job.OutputFn != nil {
+				job.OutputFn(job.Name, response)
+			}
 		}
 	}
 }

@@ -21,6 +21,7 @@ const telegramMaxMessageLength = 4096
 type TelegramChannel struct {
 	token          string
 	requireMention bool
+	sendOnly       bool // when true, Connect skips polling (for chat mode)
 	botUsername     string
 
 	bot     *bot.Bot
@@ -41,6 +42,11 @@ func NewTelegramChannel(token string, requireMention bool) *TelegramChannel {
 }
 
 func (t *TelegramChannel) Name() string { return "telegram" }
+
+// SetSendOnly enables send-only mode. When true, Connect will establish the
+// bot client but skip polling for updates, avoiding conflicts with another
+// running instance (e.g. goclaw start).
+func (t *TelegramChannel) SetSendOnly(v bool) { t.sendOnly = v }
 
 // BotUsername returns the bot's username (available after Connect).
 func (t *TelegramChannel) BotUsername() string {
@@ -91,7 +97,9 @@ func (t *TelegramChannel) Connect(ctx context.Context) error {
 
 	slog.Info("telegram bot connected", "username", me.Username)
 
-	go b.Start(ctx)
+	if !t.sendOnly {
+		go b.Start(ctx)
+	}
 
 	return nil
 }

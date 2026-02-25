@@ -50,6 +50,7 @@ func main() {
 	rootCmd.AddCommand(
 		startCmd(),
 		chatCmd(),
+		clearCmd(),
 		statusCmd(),
 		versionCmd(),
 		onboardCmd(),
@@ -91,6 +92,32 @@ func chatCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&configPath, "config", "c", "", "path to config file")
 	cmd.Flags().StringVarP(&model, "model", "m", "", "override model (e.g. anthropic/claude-opus-4-0-20250514)")
 	return cmd
+}
+
+func clearCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "clear [agent]",
+		Short: "Clear the chat session history",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			agentID := "default"
+			if len(args) > 0 {
+				agentID = args[0]
+			}
+			return runClear(agentID)
+		},
+	}
+	return cmd
+}
+
+func runClear(agentID string) error {
+	dataDir := config.DefaultDataDir()
+	store := session.NewStore(filepath.Join(dataDir, "sessions"))
+	if err := store.Delete(agentID, "cli_local"); err != nil {
+		return fmt.Errorf("clear session: %w", err)
+	}
+	fmt.Printf("Session cleared for agent %q.\n", agentID)
+	return nil
 }
 
 func statusCmd() *cobra.Command {
@@ -301,13 +328,12 @@ func runStart(configPath string) error {
 			agentID := agentCfg.ID
 
 			agentFn := func(ctx context.Context, prompt string) (string, error) {
-				sess, err := sessionStore.Load(agentID, "heartbeat")
-				if err != nil {
-					return "", err
-				}
+				// Fresh session per heartbeat run to avoid unbounded token growth.
+				sess := session.NewSession(agentID, "heartbeat")
 
 				hbToolReg := tools.NewRegistry()
 				tools.RegisterCoreTools(hbToolReg, agentWorkspace)
+				tools.RegisterSendMessage(hbToolReg, chanMgr)
 
 				rt := &agent.Runtime{
 					LLM:       provider,
@@ -341,12 +367,11 @@ func runStart(configPath string) error {
 			jobPrompt := cronJob.Prompt
 
 			agentFn := func(ctx context.Context, prompt string) (string, error) {
-				sess, err := sessionStore.Load(agentID, "cron_"+cronJob.Name)
-				if err != nil {
-					return "", err
-				}
+				// Fresh session per cron run to avoid unbounded token growth.
+				sess := session.NewSession(agentID, "cron_"+cronJob.Name)
 				cronToolReg := tools.NewRegistry()
 				tools.RegisterCoreTools(cronToolReg, agentWorkspace)
+				tools.RegisterSendMessage(cronToolReg, chanMgr)
 				rt := &agent.Runtime{
 					LLM:       provider,
 					Tools:     cronToolReg,
@@ -381,12 +406,11 @@ func runStart(configPath string) error {
 				if !ok {
 					return "", fmt.Errorf("provider %q not available", pName)
 				}
-				cronSess, err := sessionStore.Load(defaultCfg.ID, "cron_"+jobName)
-				if err != nil {
-					return "", err
-				}
+				// Fresh session per cron run to avoid unbounded token growth.
+				cronSess := session.NewSession(defaultCfg.ID, "cron_"+jobName)
 				cronToolReg := tools.NewRegistry()
 				tools.RegisterCoreTools(cronToolReg, defaultCfg.Workspace)
+				tools.RegisterSendMessage(cronToolReg, chanMgr)
 				rt := &agent.Runtime{
 					LLM:       p,
 					Tools:     cronToolReg,
@@ -513,20 +537,67 @@ func runChat(agentID, configPath, modelOverride string) error {
 	toolReg := tools.NewRegistry()
 	tools.RegisterCoreTools(toolReg, agentCfg.Workspace)
 
-	// Init cron scheduler for chat mode so the agent can use the cron tool
+	// Connect channel adapters so the agent can use the send_message tool
+	sender := &chatSender{channels: make(map[string]channel.Channel)}
 	ctx := context.Background()
+
+	if cfg.Channels.Telegram.Token != "" {
+		tgChan := channel.NewTelegramChannel(
+			cfg.Channels.Telegram.Token,
+			cfg.Security.GroupPolicy.RequireMention,
+		)
+		tgChan.SetSendOnly(true)
+		if err := tgChan.Connect(ctx); err != nil {
+			slog.Warn("telegram channel failed to connect in chat mode", "error", err)
+		} else {
+			sender.channels["telegram"] = tgChan
+			slog.Info("telegram channel connected in chat mode")
+		}
+	}
+
+	waDBPath := cfg.Channels.WhatsApp.DBPath
+	if waDBPath == "" {
+		defaultDB := filepath.Join(dataDir, "whatsapp.db")
+		if _, err := os.Stat(defaultDB); err == nil {
+			waDBPath = defaultDB
+		}
+	}
+	if waDBPath != "" {
+		waChan := channel.NewWhatsAppChannel(waDBPath)
+		if err := waChan.Connect(ctx); err != nil {
+			slog.Warn("whatsapp channel failed to connect in chat mode", "error", err)
+		} else {
+			sender.channels["whatsapp"] = waChan
+			slog.Info("whatsapp channel connected in chat mode")
+		}
+	}
+
+	if len(sender.channels) > 0 {
+		tools.RegisterSendMessage(toolReg, sender)
+		defer func() {
+			for name, ch := range sender.channels {
+				if err := ch.Disconnect(); err != nil {
+					slog.Error("disconnect channel", "channel", name, "error", err)
+				}
+			}
+		}()
+	}
+
+	// Init cron scheduler for chat mode so the agent can use the cron tool
 	cronScheduler := cron.NewScheduler()
 
 	// Build an agent factory for dynamic cron jobs — each job gets its own
 	// session and runtime so it can actually execute the prompt via the LLM.
 	agentFactory := func(jobName string) func(context.Context, string) (string, error) {
 		return func(ctx context.Context, prompt string) (string, error) {
-			cronSess, err := sessionStore.Load(agentID, "cron_"+jobName)
-			if err != nil {
-				return "", err
-			}
+			// Use a fresh session for each cron run so history doesn't
+			// accumulate and consume tokens unboundedly.
+			cronSess := session.NewSession(agentID, "cron_"+jobName)
 			cronToolReg := tools.NewRegistry()
 			tools.RegisterCoreTools(cronToolReg, agentCfg.Workspace)
+			if len(sender.channels) > 0 {
+				tools.RegisterSendMessage(cronToolReg, sender)
+			}
 			cronRT := &agent.Runtime{
 				LLM:       provider,
 				Tools:     cronToolReg,
@@ -563,9 +634,15 @@ func runChat(agentID, configPath, modelOverride string) error {
 		},
 	})
 
-	// Apply tool policy from agent config
+	// Apply tool policy from agent config.
+	// If channels are connected and the policy uses an allow list,
+	// add send_message so it isn't filtered out.
+	allow := agentCfg.Tools.Allow
+	if len(sender.channels) > 0 && len(allow) > 0 {
+		allow = append(append([]string{}, allow...), "send_message")
+	}
 	policy := tools.Policy{
-		Allow: agentCfg.Tools.Allow,
+		Allow: allow,
 		Deny:  agentCfg.Tools.Deny,
 	}
 	var toolExecutor tools.Executor = toolReg
@@ -1479,6 +1556,32 @@ func runDoctor(configPath string) error {
 	}
 
 	return nil
+}
+
+// chatSender implements tools.MessageSender for chat mode.
+// It holds channel adapters that were connected at startup and delegates
+// send operations to the appropriate channel.
+type chatSender struct {
+	channels map[string]channel.Channel
+}
+
+func (s *chatSender) SendToChannel(ctx context.Context, channelName, chatID, text string) error {
+	ch, ok := s.channels[channelName]
+	if !ok {
+		return fmt.Errorf("channel %q not connected", channelName)
+	}
+	return ch.Send(ctx, channel.OutboundMessage{
+		ChatID: chatID,
+		Text:   text,
+	})
+}
+
+func (s *chatSender) AvailableChannels() []string {
+	names := make([]string, 0, len(s.channels))
+	for name := range s.channels {
+		names = append(names, name)
+	}
+	return names
 }
 
 // cronSchedulerAdapter adapts cron.Scheduler to the tools.JobScheduler interface.

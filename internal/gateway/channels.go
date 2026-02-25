@@ -218,6 +218,7 @@ func (cm *ChannelManager) handleMessage(ctx context.Context, ch channel.Channel,
 	// Create per-agent tool registry with workspace-specific tools
 	toolReg := tools.NewRegistry()
 	tools.RegisterCoreTools(toolReg, agentCfg.Workspace)
+	tools.RegisterSendMessage(toolReg, cm)
 
 	// Apply agent tool policy
 	var executor tools.Executor = toolReg

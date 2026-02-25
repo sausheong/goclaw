@@ -108,6 +108,18 @@ func (s *Store) AppendEntry(sess *Session, entry SessionEntry) {
 	}
 }
 
+// Delete removes a session's JSONL file.
+func (s *Store) Delete(agentID, key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	path := s.sessionPath(agentID, key)
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove session file: %w", err)
+	}
+	return nil
+}
+
 // Rewrite replaces the entire session JSONL file with the current entries.
 // Used after compaction to replace the old file.
 func (s *Store) Rewrite(sess *Session) {

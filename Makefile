@@ -4,11 +4,22 @@ VERSION   ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo de
 COMMIT    ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 LDFLAGS   := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT)
 
-.PHONY: build build-small run test test-race test-v lint fmt vet tidy clean snapshot install
+.PHONY: build build-app build-small run test test-race test-v lint fmt vet tidy clean snapshot install
 
 ## build: compile the binary
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(BINARY) $(CMD)
+
+## build-app: compile the menu bar app as a macOS .app bundle
+build-app:
+	go build -ldflags "$(LDFLAGS)" -o goclaw-app ./cmd/goclaw-app
+	rm -rf GoClaw.app
+	mkdir -p GoClaw.app/Contents/MacOS GoClaw.app/Contents/Resources
+	cp goclaw-app GoClaw.app/Contents/MacOS/goclaw-app
+	cp cmd/goclaw-app/Info.plist GoClaw.app/Contents/Info.plist
+	cp cmd/goclaw-app/icon.icns GoClaw.app/Contents/Resources/icon.icns
+	rm -f goclaw-app
+	@echo "Built GoClaw.app"
 
 ## build-small: compile a smaller, statically-linked binary (+ UPX on Linux)
 build-small:
@@ -54,7 +65,8 @@ tidy:
 
 ## clean: remove build artifacts
 clean:
-	rm -f $(BINARY)
+	rm -f $(BINARY) goclaw-app
+	rm -rf GoClaw.app
 	go clean
 
 ## snapshot: cross-platform build via goreleaser

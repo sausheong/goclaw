@@ -18,6 +18,7 @@ type ServerOptions struct {
 	AllowedOrigins []string // WebSocket allowed origins (empty = localhost only)
 	MetricsHandler http.HandlerFunc // optional /metrics handler
 	UIHandler      http.Handler     // optional /ui handler
+	ChatHandler    http.HandlerFunc // optional /chat handler
 }
 
 // Server is the GoClaw gateway HTTP + WebSocket server.
@@ -71,6 +72,13 @@ func (s *Server) routes() {
 
 	if s.opts.UIHandler != nil {
 		s.router.Mount("/ui", s.opts.UIHandler)
+	}
+
+	if s.opts.ChatHandler != nil {
+		s.router.Get("/chat", s.opts.ChatHandler)
+		s.router.Get("/", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/chat", http.StatusFound)
+		})
 	}
 }
 

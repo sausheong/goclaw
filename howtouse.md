@@ -6,6 +6,7 @@ GoClaw is a self-hosted AI agent gateway. It runs as a single binary on your mac
 
 - [Quick Start](#quick-start)
 - [CLI Commands](#cli-commands)
+- [macOS Menu Bar App](#macos-menu-bar-app)
 - [Configuration](#configuration)
 - [Messaging Channels](#messaging-channels)
 - [Image / Vision Support](#image--vision-support)
@@ -30,7 +31,8 @@ GoClaw is a self-hosted AI agent gateway. It runs as a single binary on your mac
 ### 1. Build
 
 ```bash
-make build
+make build        # CLI binary
+make build-app    # macOS menu bar app (GoClaw.app)
 ```
 
 ### 2. Run the setup wizard
@@ -51,6 +53,11 @@ The wizard walks you through choosing an LLM provider, entering your API key, an
 **Or start the full gateway (enables Telegram, WhatsApp, WebSocket API):**
 ```bash
 ./goclaw start
+```
+
+**Or launch the macOS menu bar app:**
+```bash
+open GoClaw.app
 ```
 
 ### 4. Verify your setup
@@ -90,6 +97,79 @@ Inside a `goclaw chat` session:
 ```
 
 The agent can read files, write files, edit files, run shell commands, fetch web pages, and search the web — all on your local machine. You can also send images for vision analysis (see [Image / Vision Support](#image--vision-support)).
+
+---
+
+## macOS Menu Bar App
+
+GoClaw includes a native macOS menu bar app that runs the gateway in the background with a system tray icon. No terminal window needed — just double-click `GoClaw.app` or drag it to `/Applications`.
+
+### Build
+
+```bash
+make build-app
+```
+
+This produces a `GoClaw.app` bundle in the project directory.
+
+### Usage
+
+Launch the app by double-clicking `GoClaw.app` or from the terminal:
+
+```bash
+open GoClaw.app
+```
+
+A claw machine icon appears in the menu bar. The gateway starts automatically in the background.
+
+### Menu items
+
+| Item | Action |
+|------|--------|
+| **Open GoClaw Chat** | Opens `http://localhost:18789/chat` in your default browser |
+| **Settings** | Opens `~/.goclaw/goclaw.json5` in your default text editor |
+| **Quit GoClaw** | Gracefully shuts down the gateway and exits the app |
+
+### Web chat interface
+
+Clicking **Open GoClaw Chat** (or visiting `http://localhost:18789/chat` directly) opens a web-based chat interface with:
+
+- **Streaming responses** — text appears as the LLM generates it
+- **Light/dark mode** — toggle via the moon/sun button in the header; preference is saved across sessions
+- **Tool call display** — tool invocations appear inline with collapsible output
+- **Markdown rendering** — code blocks, bold, italic, and links are rendered
+- **Auto-reconnect** — if the WebSocket connection drops, it reconnects automatically
+
+The root URL `http://localhost:18789` redirects to `/chat` for convenience.
+
+### Environment variables and API keys
+
+macOS `.app` bundles do not inherit environment variables from your shell profile (`.zshrc`, `.bashrc`, etc.). GoClaw.app handles this by automatically sourcing your shell environment at startup, so API keys like `ANTHROPIC_API_KEY` work as expected.
+
+If you prefer not to rely on environment variables, you can set API keys directly in the config file:
+
+```json5
+{
+  "providers": {
+    "anthropic": {
+      "kind": "anthropic",
+      "api_key": "sk-ant-..."
+    }
+  }
+}
+```
+
+### How it differs from `goclaw start`
+
+Both `goclaw start` and `GoClaw.app` run the same gateway with the same config file. The differences:
+
+| | `goclaw start` | `GoClaw.app` |
+|---|---|---|
+| Runs in | Terminal (foreground) | Menu bar (background) |
+| Chat interface | WebSocket API / web chat | Web chat in browser |
+| Quit | Ctrl+C | Menu bar > Quit GoClaw |
+| Environment vars | Inherited from shell | Loaded from shell profile |
+| Logs | Printed to terminal | System log (`Console.app`) |
 
 ---
 
@@ -820,10 +900,12 @@ When the gateway is running (`goclaw start`), it exposes a JSON-RPC 2.0 API over
 
 | Endpoint | Description |
 |----------|-------------|
+| `GET /` | Redirects to `/chat` |
 | `GET /health` | Health check (returns `{"status":"ok"}`) |
 | `GET /ws` | WebSocket endpoint |
 | `GET /metrics` | Prometheus-style metrics (if enabled) |
 | `GET /ui` | Control panel UI |
+| `GET /chat` | Web chat interface (light/dark mode, streaming) |
 
 ### Send a chat message
 

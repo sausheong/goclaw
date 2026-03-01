@@ -36,7 +36,6 @@ const chatHTML = `<!DOCTYPE html>
 	--accent2: #53a8b6;
 	--btn-text: #1a1a2e;
 	--placeholder: #555;
-	--dot-off: #555;
 	--error: #e74c3c;
 	--tool-output: #aaa;
 }
@@ -56,7 +55,6 @@ html.light {
 	--accent2: #3a7f8c;
 	--btn-text: #fff;
 	--placeholder: #999;
-	--dot-off: #ccc;
 	--error: #d32f2f;
 	--tool-output: #555;
 }
@@ -80,13 +78,14 @@ body {
 	flex-shrink: 0;
 	transition: background 0.3s, border-color 0.3s;
 }
-#header .dot {
-	width: 10px; height: 10px;
-	border-radius: 50%%;
-	background: var(--dot-off);
-	transition: background 0.3s;
+#header .logo {
+	width: 24px; height: 24px;
+	filter: invert(1);
+	transition: filter 0.3s;
 }
-#header .dot.connected { background: var(--accent); }
+html.light #header .logo {
+	filter: none;
+}
 #header h1 { font-size: 1.1rem; color: var(--accent); }
 #header .status { font-size: 0.8rem; color: var(--text-muted); }
 #header .spacer { margin-left: auto; }
@@ -253,7 +252,7 @@ body {
 </head>
 <body>
 <div id="header">
-	<div class="dot" id="conn-dot"></div>
+	<img class="logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAACXBIWXMAAAOwAAADsAEnxA+tAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAB0BJREFUeJztnduLVVUcxz9jmaONZlk50kMazRBhOhI0JuRDkA+V4aWb6UMX6C8oooiuUCC+mOUtBakHiTBfsgukFEmJWSlGQkiUWjlWlM1oMxqeHtbZZKfWcV33Ze3fBxYMZ85a67suv99e+7fXXgcEQRAEQRAEQRAEoSk7RiPykuFUE5kAtQcmQA1RyZAzZEJUHNkAtQcmQA1xyQOUHV84xhJ95F4gJojE6DmyASoOTIBao5MgJojE6DmyASoOSlOgC2oe/8s+XJ2WW8GKK9UpBjkOEO8djVIzGhSnACxdzAl1WdJzWbBnhQnQEwPkNz+yBQnQLYIDE2Si0BBEARBEARBEOpGUlEtDbInsA0pxgEEC2QC1ByZADVHJkDNkQlQc84vWkBOnAR2Ah8D+4BvgGPAUPP/XcBkoBeYAdzUTGNzVyoEZylqgG3pauYVBEEQBEFIjqTj3C1MAG4DbgZmAlOBic3//Q58B+wFdgDbgMHcFQpR6AU2Aif490se7dIJYAPQU4BeIRBjgRXAacwHvjWdApYDnTlrFzzpAfbjPvCt6VNgSq4tEJyZhYryhRr8LB1GRQmFEtNDnME/exJ059YawYpO1Co+1uBnaQ/yjKCUrCD+4Gfp2ZzalCxjgSXA68AB4DhmHX+fprxe/Fb7tmkQ/aVgqWEZx4GvgdeAe6mJV7kAeBT4FftOP4H+qd5Gh/J802qNlvHAnw7l/QI80uyjJOkBvsC9w9/XlDsBuyDPMLAS6AcubKZ+4KXm/0zLGUI/IT/waOfnJBiAmgkM4GdxT2rKXmJRxpGmFh19ze+YlnePppynPNt6lIRuObux61Rdmq8p/1XD/MO0H/yMPsw9wTpNGQsCtPcn4AoDvaXnPfw7owFcoyl/t2H+lRaaVxmWuUuT/9pAbX7XQnMpuZ0wHdEALtHU8bNh/hssdC82LHNAk39SwHbrPF/p6UAFTUJ1xGhNPSOG+W32BXYZljmsyX9BwHbvJ+Lu7ZjbwhcC10csPyZl2i4/HbWmqBQdhA/LXqypK/VLQFQvEGumL8BsxW3DZM3n3xrmX2ZRl+l2cF3dOq2uVMoLxLD+BvrF0HrD/MOoW7xz0Yf5umKtpowQt4G5eIEYHiCG9dOmzB2G+ccAb9N+EvQ1v2Majt2u+TxGEKcSXiCW9TfQh4LHYxcKHkHd589Grfa7gBubn5lafoP2oeDtkfog6h1BCBYSp+EN2j8M2hCxXl1ar9Hi+jDINC3S1Fs4Ma0/S7rFWQ9qA2degz8CXKXRsixy3aX1AosI18idwHmW9S8PWP+50ouW2kYBHwasv3ReIKT1DwJXO2joRO3ejT34n6AWlLZMw3zjS+W8QEjrv99DRzdwKKCW1vQDfk/oHgiopTReIKT1bw2gZwZq927owT8EXBdA3xuB9JTGC4Sy/gHg8kCaLgM+CqSrgXL7obaDXwr8GEhX4V4glPWfAW4NrG0MavfukIeuEeAF3K757bgF1ebKe4FQ1r8qosZu1AZOm4kwhNrto7vVC8HLFnpK6QVCWf8BYFwOertQe/jWonbyDKAsfKT59y5gDXA3bmcK2dJJmPcXC/MCIaz/NHaPaVNjFnbh59J4gVDW/3jewkvIE1TQC4SwfpdoX4qEihLm5gU6gC89xf6BiowJimmoPvHp073kdOTPHE+hDfyifakSIko4Jw+hqz1FbslDZEVp/eFr27QmD5E+W71DRvtSxDdKuCcPka4ncMSI9qWIT5TwmG1lLrcOZxzywD8LFaE9WXDIBeuxcZkAhx3yZHWVflNjCViM+z299di4VLTbIU/GYo+8dWGhR97Pgqlog89t4F+oR7XC/zMJv6NucrkN9A0EPZSHyIryIO79mlsgCPy2f2/LS2QFeQf3fs31gVAH6nrjIvQU+hc968xFuD8ZLOSRsI8XkN/i+S8+7xMUsinExwu8VYDesrOVCll/hqsXOIk6nk1QjMPu/cbCrT/DxwvcWYDesnIXFbT+DFcvsLkIsSVlMxW0/gxXLzCI/BIHqC3nLq+MlcL6M1y9QGWPQAvIfCps/RmuXmBTAVrLxiYqbv0ZLl7gNxI+HduA0bidnF4q689w9QLzihBbEuaRiPVnuHgB3UlbdWAdiVh/hosXOEo93w8YhToR3KavvqLE1p/h4gXmFqK0WOZi30+V2FDj4gVsjnJPhZUkaP0Ztl7gCPV6IesO4HsStP4MFy/QX4jSYuinJNYfy6U0UCdr2FCpGe6JbVufxn07fmHYegHTU79T4CAlsP48sF0LmJzmXXV6SPja34qtF3i+GJm58hwlsv7YrsV2LeByQmjV6LX4biWv/a2YvEdwGnWA4tRiJObKNFRbz/UCyD4SujXWrQWOowIiVxYnrTCmAM+gfxpY6Wt/K61rgYPAY8DEIkWVhC7gYdQviSex8tcxHXgFuIMEGxeAUai+WY3qK0EQBEEQBEEQBEEQhKD8DVOERr261G0EAAAAAElFTkSuQmCC" alt="GoClaw">
 	<h1>GoClaw</h1>
 	<span class="spacer"></span>
 	<button id="theme-btn" title="Toggle light/dark mode">&#9790;</button>
@@ -271,7 +270,6 @@ body {
 	var messagesEl = document.getElementById('messages');
 	var inputEl = document.getElementById('input');
 	var sendBtn = document.getElementById('send-btn');
-	var connDot = document.getElementById('conn-dot');
 	var connStatus = document.getElementById('conn-status');
 	var themeBtn = document.getElementById('theme-btn');
 
@@ -337,7 +335,6 @@ body {
 		ws = new WebSocket('ws://localhost:' + PORT + '/ws');
 
 		ws.onopen = function() {
-			connDot.classList.add('connected');
 			connStatus.textContent = 'connected';
 			sendBtn.disabled = false;
 			if (reconnectTimer) {
@@ -347,7 +344,6 @@ body {
 		};
 
 		ws.onclose = function() {
-			connDot.classList.remove('connected');
 			connStatus.textContent = 'disconnected';
 			sendBtn.disabled = true;
 			sending = false;
@@ -355,7 +351,6 @@ body {
 		};
 
 		ws.onerror = function() {
-			connDot.classList.remove('connected');
 			connStatus.textContent = 'error';
 		};
 

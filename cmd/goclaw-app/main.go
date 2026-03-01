@@ -69,8 +69,9 @@ func loadShellEnv() {
 		if !ok || k == "" {
 			continue
 		}
-		// Only set vars that aren't already present
-		if os.Getenv(k) == "" {
+		// Always override PATH so Homebrew/user paths are available.
+		// For other vars, only set if not already present.
+		if k == "PATH" || os.Getenv(k) == "" {
 			os.Setenv(k, v)
 		}
 	}
@@ -112,11 +113,11 @@ func onReady() {
 	}
 
 	// Menu items
-	mChat := systray.AddMenuItem("Open GoClaw Chat", "Open chat in browser")
-	mLogs := systray.AddMenuItem("Open GoClaw Logs", "Open logs in browser")
+	mChat := systray.AddMenuItem("Chat", "Open chat in browser")
+	mLogs := systray.AddMenuItem("Logs", "Open logs in browser")
 	mSettings := systray.AddMenuItem("Settings", "Open config file")
 	systray.AddSeparator()
-	mQuit := systray.AddMenuItem("Quit GoClaw", "Shut down and exit")
+	mQuit := systray.AddMenuItem("Quit", "Shut down and exit")
 
 	go func() {
 		for {

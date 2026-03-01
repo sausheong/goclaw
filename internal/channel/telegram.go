@@ -62,8 +62,16 @@ func (t *TelegramChannel) Connect(ctx context.Context) error {
 
 	ctx, cancel := context.WithCancel(ctx)
 
+	// Use a generous HTTP client timeout (2 min) to avoid "context deadline
+	// exceeded" errors on slow or proxied networks. The poll timeout (30s)
+	// controls how long Telegram holds the connection before returning an
+	// empty response; the HTTP client timeout must be longer than that.
+	pollTimeout := 30 * time.Second
+	httpClient := &http.Client{Timeout: 2 * time.Minute}
+
 	opts := []bot.Option{
 		bot.WithDefaultHandler(t.defaultHandler),
+		bot.WithHTTPClient(pollTimeout, httpClient),
 		bot.WithErrorsHandler(func(err error) {
 			slog.Error("telegram bot error", "error", err)
 		}),

@@ -374,6 +374,10 @@ html.light #header .logo {
 					appendToAssistant(r.text);
 					break;
 				case 'tool_call_start':
+					if (currentAssistant) {
+						finalizeAssistant();
+						currentAssistant = null;
+					}
 					addToolCall(r.tool, r.id, r.input);
 					break;
 				case 'tool_result':

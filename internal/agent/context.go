@@ -14,6 +14,24 @@ import (
 
 const maxToolResultLen = 10000 // truncate tool results longer than this
 
+// detectImageMIME returns the actual MIME type based on magic bytes.
+// Falls back to the provided hint if the format is unrecognized.
+func detectImageMIME(data []byte, hint string) string {
+	if len(data) >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF {
+		return "image/jpeg"
+	}
+	if len(data) >= 4 && data[0] == 0x89 && data[1] == 'P' && data[2] == 'N' && data[3] == 'G' {
+		return "image/png"
+	}
+	if len(data) >= 4 && data[0] == 'G' && data[1] == 'I' && data[2] == 'F' && data[3] == '8' {
+		return "image/gif"
+	}
+	if len(data) >= 4 && data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F' {
+		return "image/webp"
+	}
+	return hint
+}
+
 const defaultIdentity = `You are a helpful AI assistant called GoClaw. You can read files, write files, edit files, execute bash commands on the user's machine, fetch web pages, search the web, automate a headless browser, send messages to other channels, and schedule recurring tasks. You have vision capabilities — you can see and analyze images. Be concise and helpful. When executing tasks, think step by step and use your tools to accomplish the user's goals. When asked to access websites, use the web_fetch tool or the browser tool for interactive pages. When asked to search for information, use the web_search tool. When asked to schedule recurring tasks, use the cron tool. When asked to send messages to other users or channels, use the send_message tool. When you need to visually inspect images (screenshots, photos, camera feeds, etc.), use read_file on the image file or use the browser tool's screenshot action — both return the image for you to see and describe. Do not say you cannot see or analyze images.`
 
 // assembleSystemPrompt builds the system prompt from the workspace identity file.
@@ -77,7 +95,7 @@ func assembleMessages(history []session.SessionEntry) []llm.Message {
 						continue
 					}
 					msg.Images = append(msg.Images, llm.ImageContent{
-						MimeType: img.MimeType,
+						MimeType: detectImageMIME(data, img.MimeType),
 						Data:     data,
 					})
 				}
@@ -125,7 +143,7 @@ func assembleMessages(history []session.SessionEntry) []llm.Message {
 					continue
 				}
 				msg.Images = append(msg.Images, llm.ImageContent{
-					MimeType: img.MimeType,
+					MimeType: detectImageMIME(data, img.MimeType),
 					Data:     data,
 				})
 			}

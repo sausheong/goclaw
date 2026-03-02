@@ -41,14 +41,14 @@ func TestAssembleSystemPromptWithIdentity(t *testing.T) {
 	err := os.WriteFile(filepath.Join(dir, "IDENTITY.md"), []byte(identityContent), 0o644)
 	require.NoError(t, err)
 
-	result := assembleSystemPrompt(dir, "")
+	result := assembleSystemPrompt(dir, "", "test", "Test Agent")
 	assert.Contains(t, result, identityContent)
 	assert.Contains(t, result, "configuration file")
 }
 
 func TestAssembleSystemPromptDefault(t *testing.T) {
 	dir := t.TempDir() // no IDENTITY.md
-	result := assembleSystemPrompt(dir, "")
+	result := assembleSystemPrompt(dir, "", "default", "Assistant")
 	assert.Contains(t, result, defaultIdentity)
 	assert.Contains(t, result, "data directory")
 }
@@ -60,9 +60,15 @@ func TestAssembleSystemPromptConfigOverride(t *testing.T) {
 	require.NoError(t, err)
 
 	configPrompt := "You are a custom agent from config."
-	result := assembleSystemPrompt(dir, configPrompt)
+	result := assembleSystemPrompt(dir, configPrompt, "custom", "Custom Agent")
 	assert.Contains(t, result, configPrompt)
 	assert.NotContains(t, result, "identity file content")
+}
+
+func TestAssembleSystemPromptSelfIdentity(t *testing.T) {
+	dir := t.TempDir()
+	result := assembleSystemPrompt(dir, "", "supervisor", "Supervisor")
+	assert.Contains(t, result, `"Supervisor" agent (id: supervisor)`)
 }
 
 // --- assembleMessages tests ---

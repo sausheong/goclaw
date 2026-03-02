@@ -232,6 +232,8 @@ func (h *WebSocketHandler) handleChatSend(conn *websocket.Conn, req JSONRPCReque
 		LLM:          provider,
 		Tools:        executor,
 		Session:      sess,
+		AgentID:      agentCfg.ID,
+		AgentName:    agentCfg.Name,
 		Model:        modelName,
 		Workspace:    agentCfg.Workspace,
 		MaxTurns:     agentCfg.MaxTurns,

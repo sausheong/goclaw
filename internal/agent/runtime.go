@@ -40,6 +40,8 @@ type Runtime struct {
 	LLM          llm.LLMProvider
 	Tools        tools.Executor
 	Session      *session.Session
+	AgentID      string // agent identifier (e.g. "default", "coder")
+	AgentName    string // human-readable name (e.g. "Assistant", "Coder")
 	Model        string
 	Workspace    string
 	MaxTurns     int // safety limit for tool-use loops
@@ -83,7 +85,7 @@ func (r *Runtime) Run(ctx context.Context, userMsg string, images []llm.ImageCon
 			}
 
 			// Assemble context with skills and memory
-			systemPrompt := assembleSystemPrompt(r.Workspace, r.SystemPrompt)
+			systemPrompt := assembleSystemPrompt(r.Workspace, r.SystemPrompt, r.AgentID, r.AgentName)
 
 			// Inject relevant skills
 			if r.Skills != nil {

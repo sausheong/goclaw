@@ -42,7 +42,7 @@ const defaultIdentity = `You are a helpful AI assistant called GoClaw. You can r
 //
 // The config and data directory paths are always appended so the agent
 // knows where to find its own configuration.
-func assembleSystemPrompt(workspace, systemPrompt string) string {
+func assembleSystemPrompt(workspace, systemPrompt, agentID, agentName string) string {
 	var base string
 	if systemPrompt != "" {
 		base = systemPrompt
@@ -54,6 +54,12 @@ func assembleSystemPrompt(workspace, systemPrompt string) string {
 		} else {
 			base = string(data)
 		}
+	}
+
+	// Inject self-identity so the agent knows who it is
+	if agentID != "" {
+		identity := fmt.Sprintf("\n\nYou are the %q agent (id: %s).", agentName, agentID)
+		base += identity
 	}
 
 	base += fmt.Sprintf("\n\nYour configuration file is at %s and your data directory is %s.",

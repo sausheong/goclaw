@@ -93,6 +93,8 @@ func (r *AgentRunnerImpl) RunAgent(ctx context.Context, agentID, prompt string) 
 		LLM:          provider,
 		Tools:        executor,
 		Session:      sess,
+		AgentID:      agentCfg.ID,
+		AgentName:    agentCfg.Name,
 		Model:        modelName,
 		Workspace:    agentCfg.Workspace,
 		MaxTurns:     agentCfg.MaxTurns,

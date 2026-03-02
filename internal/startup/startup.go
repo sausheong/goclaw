@@ -314,6 +314,7 @@ func StartGateway(configPath, version string, opts ...Options) (*Result, error) 
 			agentMaxTurns := agentCfg.MaxTurns
 
 			agentSystemPrompt := agentCfg.SystemPrompt
+			agentName := agentCfg.Name
 			agentFn := func(ctx context.Context, prompt string) (string, error) {
 				sess := session.NewSession(agentID, "heartbeat")
 				hbToolReg := tools.NewRegistry()
@@ -324,6 +325,8 @@ func StartGateway(configPath, version string, opts ...Options) (*Result, error) 
 					LLM:          provider,
 					Tools:        hbToolReg,
 					Session:      sess,
+					AgentID:      agentID,
+					AgentName:    agentName,
 					Model:        modelName,
 					Workspace:    agentWorkspace,
 					MaxTurns:     agentMaxTurns,
@@ -355,6 +358,7 @@ func StartGateway(configPath, version string, opts ...Options) (*Result, error) 
 			jobPrompt := cronJob.Prompt
 
 			agentSystemPrompt := agentCfg.SystemPrompt
+			agentName := agentCfg.Name
 			agentFn := func(ctx context.Context, prompt string) (string, error) {
 				sess := session.NewSession(agentID, "cron_"+cronJob.Name)
 				cronToolReg := tools.NewRegistry()
@@ -364,6 +368,8 @@ func StartGateway(configPath, version string, opts ...Options) (*Result, error) 
 					LLM:          provider,
 					Tools:        cronToolReg,
 					Session:      sess,
+					AgentID:      agentID,
+					AgentName:    agentName,
 					Model:        modelName,
 					Workspace:    agentWorkspace,
 					MaxTurns:     agentMaxTurns,
@@ -402,6 +408,8 @@ func StartGateway(configPath, version string, opts ...Options) (*Result, error) 
 					LLM:          p,
 					Tools:        cronToolReg,
 					Session:      cronSess,
+					AgentID:      defaultCfg.ID,
+					AgentName:    defaultCfg.Name,
 					Model:        mName,
 					Workspace:    defaultCfg.Workspace,
 					MaxTurns:     defaultCfg.MaxTurns,

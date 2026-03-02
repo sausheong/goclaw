@@ -313,6 +313,7 @@ func StartGateway(configPath, version string, opts ...Options) (*Result, error) 
 			agentID := agentCfg.ID
 			agentMaxTurns := agentCfg.MaxTurns
 
+			agentSystemPrompt := agentCfg.SystemPrompt
 			agentFn := func(ctx context.Context, prompt string) (string, error) {
 				sess := session.NewSession(agentID, "heartbeat")
 				hbToolReg := tools.NewRegistry()
@@ -320,14 +321,15 @@ func StartGateway(configPath, version string, opts ...Options) (*Result, error) 
 				tools.RegisterSendMessage(hbToolReg, chanMgr)
 
 				rt := &agent.Runtime{
-					LLM:       provider,
-					Tools:     hbToolReg,
-					Session:   sess,
-					Model:     modelName,
-					Workspace: agentWorkspace,
-					MaxTurns:  agentMaxTurns,
-					Skills:    skillLoader,
-					Memory:    memMgr,
+					LLM:          provider,
+					Tools:        hbToolReg,
+					Session:      sess,
+					Model:        modelName,
+					Workspace:    agentWorkspace,
+					MaxTurns:     agentMaxTurns,
+					SystemPrompt: agentSystemPrompt,
+					Skills:       skillLoader,
+					Memory:       memMgr,
 				}
 				return rt.RunSync(ctx, prompt, nil)
 			}
@@ -352,20 +354,22 @@ func StartGateway(configPath, version string, opts ...Options) (*Result, error) 
 			agentMaxTurns := agentCfg.MaxTurns
 			jobPrompt := cronJob.Prompt
 
+			agentSystemPrompt := agentCfg.SystemPrompt
 			agentFn := func(ctx context.Context, prompt string) (string, error) {
 				sess := session.NewSession(agentID, "cron_"+cronJob.Name)
 				cronToolReg := tools.NewRegistry()
 				tools.RegisterCoreTools(cronToolReg, agentWorkspace)
 				tools.RegisterSendMessage(cronToolReg, chanMgr)
 				rt := &agent.Runtime{
-					LLM:       provider,
-					Tools:     cronToolReg,
-					Session:   sess,
-					Model:     modelName,
-					Workspace: agentWorkspace,
-					MaxTurns:  agentMaxTurns,
-					Skills:    skillLoader,
-					Memory:    memMgr,
+					LLM:          provider,
+					Tools:        cronToolReg,
+					Session:      sess,
+					Model:        modelName,
+					Workspace:    agentWorkspace,
+					MaxTurns:     agentMaxTurns,
+					SystemPrompt: agentSystemPrompt,
+					Skills:       skillLoader,
+					Memory:       memMgr,
 				}
 				return rt.RunSync(ctx, prompt, nil)
 			}
@@ -395,14 +399,15 @@ func StartGateway(configPath, version string, opts ...Options) (*Result, error) 
 				tools.RegisterCoreTools(cronToolReg, defaultCfg.Workspace)
 				tools.RegisterSendMessage(cronToolReg, chanMgr)
 				rt := &agent.Runtime{
-					LLM:       p,
-					Tools:     cronToolReg,
-					Session:   cronSess,
-					Model:     mName,
-					Workspace: defaultCfg.Workspace,
-					MaxTurns:  defaultCfg.MaxTurns,
-					Skills:    skillLoader,
-					Memory:    memMgr,
+					LLM:          p,
+					Tools:        cronToolReg,
+					Session:      cronSess,
+					Model:        mName,
+					Workspace:    defaultCfg.Workspace,
+					MaxTurns:     defaultCfg.MaxTurns,
+					SystemPrompt: defaultCfg.SystemPrompt,
+					Skills:       skillLoader,
+					Memory:       memMgr,
 				}
 				return rt.RunSync(ctx, prompt, nil)
 			}

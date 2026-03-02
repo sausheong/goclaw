@@ -90,14 +90,15 @@ func (r *AgentRunnerImpl) RunAgent(ctx context.Context, agentID, prompt string) 
 	sess := session.NewSession(agentID, fmt.Sprintf("delegate_%s", agentID))
 
 	rt := &agent.Runtime{
-		LLM:       provider,
-		Tools:     executor,
-		Session:   sess,
-		Model:     modelName,
-		Workspace: agentCfg.Workspace,
-		MaxTurns:  agentCfg.MaxTurns,
-		Skills:    r.skills,
-		Memory:    r.memory,
+		LLM:          provider,
+		Tools:        executor,
+		Session:      sess,
+		Model:        modelName,
+		Workspace:    agentCfg.Workspace,
+		MaxTurns:     agentCfg.MaxTurns,
+		SystemPrompt: agentCfg.SystemPrompt,
+		Skills:       r.skills,
+		Memory:       r.memory,
 	}
 
 	slog.Info("delegating to agent", "agent", agentID, "prompt_len", len(prompt))

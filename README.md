@@ -312,6 +312,7 @@ The naming convention is `{PROVIDER}_API_KEY` (or `{PROVIDER}_AUTH_TOKEN`), and 
         "name": "Assistant",
         "model": "anthropic/claude-sonnet-4-5-20250514",
         "workspace": "~/.goclaw/workspace-default",
+        "system_prompt": "You are a helpful coding assistant.",  // optional: overrides IDENTITY.md
         "tools": {
           "allow": ["read_file", "write_file", "edit_file", "bash", "web_fetch", "web_search", "browser", "send_message", "cron", "ask_agent"]
         }
@@ -372,7 +373,7 @@ All state lives in `~/.goclaw/` — no external database required.
   memory/entries/          # Memory entries (Markdown)
   skills/                  # Shared skills (SKILL.md files)
   workspace-default/       # Default agent workspace
-    IDENTITY.md            # Agent identity/persona
+    IDENTITY.md            # Agent identity/persona (fallback if no system_prompt in config)
     HEARTBEAT.md           # Heartbeat checklist
     skills/                # Agent-specific skills
   whatsapp.db              # WhatsApp device credentials (SQLite)

@@ -23,6 +23,7 @@ const (
 	EventToolResult
 	EventDone
 	EventError
+	EventAborted
 )
 
 // AgentEvent is a single streaming event from the agent.
@@ -36,14 +37,15 @@ type AgentEvent struct {
 
 // Runtime is the agent think-act loop.
 type Runtime struct {
-	LLM       llm.LLMProvider
-	Tools     tools.Executor
-	Session   *session.Session
-	Model     string
-	Workspace string
-	MaxTurns  int // safety limit for tool-use loops
-	Skills    *skill.Loader   // optional: skill loader for selective injection
-	Memory    *memory.Manager // optional: memory manager for context retrieval
+	LLM          llm.LLMProvider
+	Tools        tools.Executor
+	Session      *session.Session
+	Model        string
+	Workspace    string
+	MaxTurns     int // safety limit for tool-use loops
+	SystemPrompt string          // optional: inline system prompt (overrides IDENTITY.md)
+	Skills       *skill.Loader   // optional: skill loader for selective injection
+	Memory       *memory.Manager // optional: memory manager for context retrieval
 }
 
 // Run executes the agent loop for a user message, returning a channel of events.
@@ -74,8 +76,14 @@ func (r *Runtime) Run(ctx context.Context, userMsg string, images []llm.ImageCon
 		}
 
 		for turn := 0; turn < maxTurns; turn++ {
+			// Check for cancellation at the top of each turn
+			if ctx.Err() != nil {
+				events <- AgentEvent{Type: EventAborted}
+				return
+			}
+
 			// Assemble context with skills and memory
-			systemPrompt := assembleSystemPrompt(r.Workspace)
+			systemPrompt := assembleSystemPrompt(r.Workspace, r.SystemPrompt)
 
 			// Inject relevant skills
 			if r.Skills != nil {
@@ -158,11 +166,23 @@ func (r *Runtime) Run(ctx context.Context, userMsg string, images []llm.ImageCon
 
 			// Execute tools
 			for _, tc := range toolCalls {
+				// Check for cancellation before each tool
+				if ctx.Err() != nil {
+					events <- AgentEvent{Type: EventAborted}
+					return
+				}
+
 				slog.Info("executing tool", "tool", tc.Name, "id", tc.ID, "input", string(tc.Input))
 
 				result, err := r.Tools.Execute(ctx, tc.Name, tc.Input)
 				if err != nil {
 					result = tools.ToolResult{Error: err.Error()}
+				}
+
+				// Check for cancellation after tool execution
+				if ctx.Err() != nil {
+					events <- AgentEvent{Type: EventAborted}
+					return
 				}
 
 				// Log tool result
@@ -200,7 +220,7 @@ func (r *Runtime) Run(ctx context.Context, userMsg string, images []llm.ImageCon
 
 		events <- AgentEvent{
 			Type:  EventError,
-			Error: fmt.Errorf("agent exceeded maximum turns (%d)", r.MaxTurns),
+			Error: fmt.Errorf("agent exceeded maximum turns (%d)", maxTurns),
 		}
 	}()
 

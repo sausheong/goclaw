@@ -769,7 +769,23 @@ Agents can delegate subtasks to other agents using the `ask_agent` tool. This en
 
 ### Agent identity
 
-Each agent can have a custom identity by placing an `IDENTITY.md` file in its workspace:
+Each agent's system prompt is resolved in this priority order:
+
+1. **`system_prompt` in config** — if the agent config has a non-empty `system_prompt` field, it is used directly
+2. **`IDENTITY.md` in workspace** — if the file exists in the agent's workspace directory
+3. **Built-in default** — a generic helpful-assistant prompt
+
+Inline config example:
+
+```json5
+{
+  "id": "coder",
+  "model": "anthropic/claude-sonnet-4-5-20250514",
+  "system_prompt": "You are a senior Go developer. You write clean, idiomatic Go code. Always write tests for new code."
+}
+```
+
+Or use an `IDENTITY.md` file in the workspace:
 
 ```bash
 cat > ~/.goclaw/workspace-coder/IDENTITY.md << 'EOF'

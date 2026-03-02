@@ -41,14 +41,25 @@ func TestAssembleSystemPromptWithIdentity(t *testing.T) {
 	err := os.WriteFile(filepath.Join(dir, "IDENTITY.md"), []byte(identityContent), 0o644)
 	require.NoError(t, err)
 
-	result := assembleSystemPrompt(dir)
+	result := assembleSystemPrompt(dir, "")
 	assert.Equal(t, identityContent, result)
 }
 
 func TestAssembleSystemPromptDefault(t *testing.T) {
 	dir := t.TempDir() // no IDENTITY.md
-	result := assembleSystemPrompt(dir)
+	result := assembleSystemPrompt(dir, "")
 	assert.Equal(t, defaultIdentity, result)
+}
+
+func TestAssembleSystemPromptConfigOverride(t *testing.T) {
+	dir := t.TempDir()
+	// Even with IDENTITY.md present, config system_prompt takes priority
+	err := os.WriteFile(filepath.Join(dir, "IDENTITY.md"), []byte("identity file content"), 0o644)
+	require.NoError(t, err)
+
+	configPrompt := "You are a custom agent from config."
+	result := assembleSystemPrompt(dir, configPrompt)
+	assert.Equal(t, configPrompt, result)
 }
 
 // --- assembleMessages tests ---

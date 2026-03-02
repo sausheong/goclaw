@@ -282,14 +282,15 @@ func (cm *ChannelManager) handleMessage(ctx context.Context, ch channel.Channel,
 	}
 
 	rt := &agent.Runtime{
-		LLM:       provider,
-		Tools:     executor,
-		Session:   sess,
-		Model:     modelName,
-		Workspace: agentCfg.Workspace,
-		MaxTurns:  agentCfg.MaxTurns,
-		Skills:    cm.skills,
-		Memory:    cm.memory,
+		LLM:          provider,
+		Tools:        executor,
+		Session:      sess,
+		Model:        modelName,
+		Workspace:    agentCfg.Workspace,
+		MaxTurns:     agentCfg.MaxTurns,
+		SystemPrompt: agentCfg.SystemPrompt,
+		Skills:       cm.skills,
+		Memory:       cm.memory,
 	}
 
 	slog.Info("processing message",

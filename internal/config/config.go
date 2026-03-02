@@ -52,15 +52,16 @@ type AgentsConfig struct {
 }
 
 type AgentConfig struct {
-	ID        string       `json:"id"`
-	Name      string       `json:"name"`
-	Workspace string       `json:"workspace"`
-	Model     string       `json:"model"`
-	Fallbacks []string     `json:"fallbacks"`
-	Sandbox   string       `json:"sandbox"` // "none", "docker", "namespace"
-	MaxTurns  int          `json:"maxTurns,omitempty"` // max tool-use loop iterations (0 = default 25)
-	Tools     ToolPolicy   `json:"tools"`
-	Cron      []CronConfig `json:"cron,omitempty"`
+	ID           string       `json:"id"`
+	Name         string       `json:"name"`
+	Workspace    string       `json:"workspace"`
+	Model        string       `json:"model"`
+	Fallbacks    []string     `json:"fallbacks"`
+	Sandbox      string       `json:"sandbox"`                    // "none", "docker", "namespace"
+	MaxTurns     int          `json:"maxTurns,omitempty"`         // max tool-use loop iterations (0 = default 25)
+	SystemPrompt string       `json:"system_prompt,omitempty"`    // inline system prompt (overrides IDENTITY.md)
+	Tools        ToolPolicy   `json:"tools"`
+	Cron         []CronConfig `json:"cron,omitempty"`
 }
 
 type CronConfig struct {

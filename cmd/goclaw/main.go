@@ -307,14 +307,15 @@ func runChat(agentID, configPath, modelOverride string) error {
 				tools.RegisterSendMessage(cronToolReg, sender)
 			}
 			cronRT := &agent.Runtime{
-				LLM:       provider,
-				Tools:     cronToolReg,
-				Session:   cronSess,
-				Model:     modelName,
-				Workspace: agentCfg.Workspace,
-				MaxTurns:  agentCfg.MaxTurns,
-				Skills:    skillLoader,
-				Memory:    memMgr,
+				LLM:          provider,
+				Tools:        cronToolReg,
+				Session:      cronSess,
+				Model:        modelName,
+				Workspace:    agentCfg.Workspace,
+				MaxTurns:     agentCfg.MaxTurns,
+				SystemPrompt: agentCfg.SystemPrompt,
+				Skills:       skillLoader,
+				Memory:       memMgr,
 			}
 			return cronRT.RunSync(ctx, prompt, nil)
 		}
@@ -365,14 +366,15 @@ func runChat(agentID, configPath, modelOverride string) error {
 	}
 
 	rt := &agent.Runtime{
-		LLM:       provider,
-		Tools:     toolExecutor,
-		Session:   sess,
-		Model:     modelName,
-		Workspace: agentCfg.Workspace,
-		MaxTurns:  agentCfg.MaxTurns,
-		Skills:    skillLoader,
-		Memory:    memMgr,
+		LLM:          provider,
+		Tools:        toolExecutor,
+		Session:      sess,
+		Model:        modelName,
+		Workspace:    agentCfg.Workspace,
+		MaxTurns:     agentCfg.MaxTurns,
+		SystemPrompt: agentCfg.SystemPrompt,
+		Skills:       skillLoader,
+		Memory:       memMgr,
 	}
 
 	fmt.Printf("GoClaw chat — agent %q (model: %s)\n", agentID, modelStr)

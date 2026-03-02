@@ -19,7 +19,7 @@ GoClaw connects messaging channels (Telegram, WhatsApp, CLI) to LLMs (Claude, GP
 - **Persistent memory** — BM25 search over Markdown files, recalled automatically each turn
 - **Skill system** — Markdown files with YAML frontmatter, selectively injected per-turn based on relevance
 - **Heartbeat daemon** — proactive agent actions on a schedule via HEARTBEAT.md checklists
-- **Cron jobs** — recurring prompts on configurable intervals
+- **Cron jobs** — recurring prompts on configurable intervals, with pause/resume/remove management
 - **Vision/image support** — send photos via Telegram, WhatsApp, or CLI and the LLM describes/analyzes them
 - **Tool policies** — per-agent allow/deny lists for all ten tools
 - **Session persistence** — append-only JSONL files with DAG structure and branching
@@ -110,6 +110,7 @@ This produces `GoClaw.app` — a native macOS app bundle you can double-click or
 | Item | Action |
 |------|--------|
 | **Open GoClaw Chat** | Opens a web-based chat interface in your default browser |
+| **Jobs** | Opens the cron jobs dashboard (`/jobs`) showing active scheduled tasks |
 | **Settings** | Opens `~/.goclaw/goclaw.json5` in your default editor |
 | **Quit GoClaw** | Gracefully shuts down the gateway and exits |
 
@@ -121,7 +122,7 @@ The app serves a chat page at `http://localhost:18789/chat` (also accessible at 
 - Streaming responses via WebSocket
 - Light/dark mode toggle (persisted in browser)
 - Inline tool call display with collapsible output
-- Simple Markdown rendering (code blocks, bold, italic, links)
+- Markdown rendering (headings, code blocks, lists, horizontal rules, bold, italic, links)
 
 ### Environment variables
 
@@ -147,7 +148,7 @@ Single-process, hub-and-spoke design. All components run in one binary.
 - **Memory Manager** — BM25 text search over Markdown files in `~/.goclaw/memory/`.
 - **Skill System** — Markdown files with YAML frontmatter, selectively injected per-turn based on relevance. Compatible with OpenClaw/Claude Code/Cursor skill format.
 - **Heartbeat Daemon** — Background goroutine on configurable interval (default 30min), reads `HEARTBEAT.md`, sends to agent for proactive actions.
-- **Cron Scheduler** — Recurring prompts on configurable intervals (e.g., "24h", "1h", "30m").
+- **Cron Scheduler** — Recurring prompts on configurable intervals (e.g., "24h", "1h", "30m"). Supports pause, resume, remove, and schedule updates at runtime.
 - **Config Manager** — JSON5 config at `~/.goclaw/goclaw.json5`, hot-reloaded via fsnotify.
 
 ### Key Interfaces
@@ -355,7 +356,7 @@ Ten built-in tools that agents can use:
 | `web_search` | Search the web |
 | `browser` | Headless Chrome automation (navigate, click, type, screenshot, evaluate JS) |
 | `send_message` | Send a message to a user/group on any connected channel |
-| `cron` | Dynamically schedule or list recurring tasks |
+| `cron` | Dynamically schedule, list, pause, resume, remove, and update recurring tasks |
 | `ask_agent` | Delegate a task to another agent and get back the result |
 
 Tool access is controlled per-agent via allow/deny policies.
@@ -396,7 +397,7 @@ JSON-RPC 2.0 over WebSocket at `ws://127.0.0.1:18789/ws`.
 | `session.history` | Load conversation history for an agent |
 | `session.clear` | Clear an agent's session history |
 
-HTTP endpoints: `GET /health` (health check), `GET /ws` (WebSocket), `GET /metrics` (Prometheus metrics), `GET /ui` (control panel), `GET /chat` (web chat interface).
+HTTP endpoints: `GET /health` (health check), `GET /ws` (WebSocket), `GET /metrics` (Prometheus metrics), `GET /ui` (control panel), `GET /chat` (web chat interface), `GET /jobs` (cron jobs dashboard).
 
 ---
 
@@ -414,15 +415,17 @@ HTTP endpoints: `GET /health` (health check), `GET /ws` (WebSocket), `GET /metri
 ## Development
 
 ```bash
-make build          # Build the CLI binary
-make build-app      # Build the macOS menu bar app (GoClaw.app)
-make test           # Run all tests
-make test-race      # Run tests with race detector
-make lint           # Run golangci-lint
-make fmt            # Format source files
-make tidy           # Tidy module dependencies
-make snapshot       # Cross-platform build via goreleaser
-make help           # Show all targets
+make build                  # Build the CLI binary
+make build-app              # Build the macOS menu bar app (GoClaw.app)
+make test                   # Run all tests
+make test-race              # Run tests with race detector
+make lint                   # Run golangci-lint
+make fmt                    # Format source files
+make tidy                   # Tidy module dependencies
+make release TAG=v0.1.4     # Commit, push, create GitHub release, and build cross-platform binaries
+make build-release          # Cross-compile binaries without creating a GitHub release
+make snapshot               # Cross-platform build via goreleaser
+make help                   # Show all targets
 ```
 
 ### Dependencies

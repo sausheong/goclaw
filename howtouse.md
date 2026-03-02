@@ -129,6 +129,7 @@ A claw machine icon appears in the menu bar. The gateway starts automatically in
 | Item | Action |
 |------|--------|
 | **Open GoClaw Chat** | Opens `http://localhost:18789/chat` in your default browser |
+| **Jobs** | Opens the cron jobs dashboard (`http://localhost:18789/jobs`) showing active scheduled tasks |
 | **Settings** | Opens `~/.goclaw/goclaw.json5` in your default text editor |
 | **Quit GoClaw** | Gracefully shuts down the gateway and exits the app |
 
@@ -142,7 +143,7 @@ Clicking **Open GoClaw Chat** (or visiting `http://localhost:18789/chat` directl
 - **Light/dark mode** — toggle via the moon/sun button in the header; preference is saved across sessions
 - **Session management** — Clear button wipes the current agent's session; switching agents loads that agent's history
 - **Tool call display** — tool invocations appear inline with collapsible output
-- **Markdown rendering** — code blocks, bold, italic, and links are rendered
+- **Markdown rendering** — headings (h1–h6), code blocks, ordered and unordered lists, horizontal rules, bold, italic, and links are rendered
 - **Auto-reconnect** — if the WebSocket connection drops, it reconnects automatically
 
 The root URL `http://localhost:18789` redirects to `/chat` for convenience.
@@ -795,6 +796,21 @@ Always write tests for new code.
 EOF
 ```
 
+### Agent self-awareness
+
+Every agent automatically knows:
+
+- **Who it is** — its own name and ID (e.g., "You are the 'Coder' agent (id: coder)")
+- **Where its config lives** — the path to `goclaw.json5` and the data directory
+- **What other agents exist** — a summary of all configured agents with their IDs, models, and tools
+- **What channels are connected** — which messaging channels (Telegram, WhatsApp, CLI) are configured
+
+This is injected automatically into every agent's system prompt, so agents can reference each other and understand the broader system topology without any manual configuration.
+
+### Dynamic default identity
+
+When no `system_prompt` or `IDENTITY.md` is provided, the built-in default identity is tailored to the agent's actual tool set. An agent with only `read_file` and `bash` will be told it can read files and execute commands — but won't claim it can search the web or send messages. This prevents agents from hallucinating capabilities they don't have.
+
 ### Model fallbacks
 
 If the primary model's provider is unavailable, the agent can fall back to alternatives:
@@ -1095,7 +1111,7 @@ Agent: [checks API, finds it's down]
 
 ## Dynamic Cron Tool
 
-The `cron` tool lets agents dynamically create and list recurring scheduled tasks at runtime — without editing the config file.
+The `cron` tool lets agents dynamically create, list, pause, resume, remove, and update recurring scheduled tasks at runtime — without editing the config file.
 
 ### Enable for an agent
 
@@ -1124,6 +1140,35 @@ The `cron` tool lets agents dynamically create and list recurring scheduled task
 |-----------|------|-------------|
 | `action` | string | `"list"` |
 
+**Remove a job:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `action` | string | `"remove"` |
+| `name` | string | Name of the job to remove |
+
+**Pause a job:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `action` | string | `"pause"` |
+| `name` | string | Name of the job to pause |
+
+**Resume a job:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `action` | string | `"resume"` |
+| `name` | string | Name of the job to resume |
+
+**Update a job's schedule:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `action` | string | `"update"` |
+| `name` | string | Name of the job to update |
+| `schedule` | string | New schedule duration |
+
 ### Example conversation
 
 ```
@@ -1137,6 +1182,18 @@ Agent: [uses cron tool: action="list"]
        Currently scheduled jobs:
        1. disk-check — every 1h — "Check disk usage with 'df -h'..."
        2. daily-summary — every 24h — "Generate a summary of..."
+
+You: Pause the disk check job for now.
+Agent: [uses cron tool: action="pause", name="disk-check"]
+       Done. The disk-check job is paused. It won't run until you resume it.
+
+You: Change the daily summary to run every 12 hours instead.
+Agent: [uses cron tool: action="update", name="daily-summary", schedule="12h"]
+       Done. The daily-summary job now runs every 12 hours.
+
+You: Remove the disk check job entirely.
+Agent: [uses cron tool: action="remove", name="disk-check"]
+       Done. The disk-check job has been removed.
 ```
 
 ### Static vs dynamic cron
@@ -1261,7 +1318,7 @@ Each agent can have its own tool allow/deny list, controlling what actions it ca
 | `web_search` | Search the web |
 | `browser` | Headless Chrome automation (navigate, click, type, screenshot, evaluate JS) |
 | `send_message` | Send a message to a user/group on any connected channel |
-| `cron` | Dynamically schedule or list recurring tasks |
+| `cron` | Dynamically schedule, list, pause, resume, remove, and update recurring tasks |
 | `ask_agent` | Delegate a task to another agent and get back the result |
 
 ### Policy examples
@@ -1330,6 +1387,7 @@ When the gateway is running (`goclaw start`), it exposes a JSON-RPC 2.0 API over
 | `GET /metrics` | Prometheus-style metrics (if enabled) |
 | `GET /ui` | Control panel UI |
 | `GET /chat` | Web chat interface (light/dark mode, streaming) |
+| `GET /jobs` | Cron jobs dashboard (view active scheduled tasks) |
 
 ### Send a chat message
 

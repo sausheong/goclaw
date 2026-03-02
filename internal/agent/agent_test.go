@@ -42,13 +42,15 @@ func TestAssembleSystemPromptWithIdentity(t *testing.T) {
 	require.NoError(t, err)
 
 	result := assembleSystemPrompt(dir, "")
-	assert.Equal(t, identityContent, result)
+	assert.Contains(t, result, identityContent)
+	assert.Contains(t, result, "configuration file")
 }
 
 func TestAssembleSystemPromptDefault(t *testing.T) {
 	dir := t.TempDir() // no IDENTITY.md
 	result := assembleSystemPrompt(dir, "")
-	assert.Equal(t, defaultIdentity, result)
+	assert.Contains(t, result, defaultIdentity)
+	assert.Contains(t, result, "data directory")
 }
 
 func TestAssembleSystemPromptConfigOverride(t *testing.T) {
@@ -59,7 +61,8 @@ func TestAssembleSystemPromptConfigOverride(t *testing.T) {
 
 	configPrompt := "You are a custom agent from config."
 	result := assembleSystemPrompt(dir, configPrompt)
-	assert.Equal(t, configPrompt, result)
+	assert.Contains(t, result, configPrompt)
+	assert.NotContains(t, result, "identity file content")
 }
 
 // --- assembleMessages tests ---

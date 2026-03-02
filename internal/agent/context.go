@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/sausheong/goclaw/internal/config"
 	"github.com/sausheong/goclaw/internal/llm"
 	"github.com/sausheong/goclaw/internal/session"
 )
@@ -38,16 +39,71 @@ const defaultIdentity = `You are a helpful AI assistant called GoClaw. You can r
 //  1. systemPrompt from config (if non-empty)
 //  2. IDENTITY.md in workspace (if file exists)
 //  3. Built-in defaultIdentity
+//
+// The config and data directory paths are always appended so the agent
+// knows where to find its own configuration.
 func assembleSystemPrompt(workspace, systemPrompt string) string {
+	var base string
 	if systemPrompt != "" {
-		return systemPrompt
+		base = systemPrompt
+	} else {
+		identityPath := filepath.Join(workspace, "IDENTITY.md")
+		data, err := os.ReadFile(identityPath)
+		if err != nil {
+			base = defaultIdentity
+		} else {
+			base = string(data)
+		}
 	}
-	identityPath := filepath.Join(workspace, "IDENTITY.md")
-	data, err := os.ReadFile(identityPath)
+
+	base += fmt.Sprintf("\n\nYour configuration file is at %s and your data directory is %s.",
+		config.DefaultConfigPath(), config.DefaultDataDir())
+
+	if summary := configSummary(); summary != "" {
+		base += "\n\n" + summary
+	}
+
+	return base
+}
+
+// configSummary loads the config and returns a brief summary of agents and
+// channels so every agent is aware of the broader system topology.
+func configSummary() string {
+	cfg, err := config.Load("")
 	if err != nil {
-		return defaultIdentity
+		return ""
 	}
-	return string(data)
+
+	var sb strings.Builder
+
+	// Agents
+	if len(cfg.Agents.List) > 0 {
+		sb.WriteString("Configured agents:")
+		for _, a := range cfg.Agents.List {
+			tools := ""
+			if len(a.Tools.Allow) > 0 {
+				tools = ", tools: " + strings.Join(a.Tools.Allow, ", ")
+			}
+			sb.WriteString(fmt.Sprintf("\n- %s (id: %s, model: %s%s)", a.Name, a.ID, a.Model, tools))
+		}
+	}
+
+	// Channels
+	var channels []string
+	if cfg.Channels.Telegram.Token != "" {
+		channels = append(channels, "telegram")
+	}
+	if cfg.Channels.WhatsApp.DBPath != "" {
+		channels = append(channels, "whatsapp")
+	}
+	if cfg.Channels.CLI.Enabled {
+		channels = append(channels, "cli")
+	}
+	if len(channels) > 0 {
+		sb.WriteString("\n\nConfigured channels: " + strings.Join(channels, ", "))
+	}
+
+	return sb.String()
 }
 
 // assembleMessages converts session history into LLM messages.

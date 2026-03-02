@@ -245,15 +245,12 @@ func (h *WebSocketHandler) handleChatSend(conn *websocket.Conn, req JSONRPCReque
 	h.activeRuns[conn] = runCancel
 	h.mu.Unlock()
 
-	defer func() {
+	events, err := rt.Run(runCtx, params.Text, nil)
+	if err != nil {
 		runCancel()
 		h.mu.Lock()
 		delete(h.activeRuns, conn)
 		h.mu.Unlock()
-	}()
-
-	events, err := rt.Run(runCtx, params.Text, nil)
-	if err != nil {
 		writeJSON(conn, JSONRPCResponse{
 			JSONRPC: "2.0",
 			Error:   map[string]any{"code": -32603, "message": err.Error()},
@@ -262,28 +259,39 @@ func (h *WebSocketHandler) handleChatSend(conn *websocket.Conn, req JSONRPCReque
 		return
 	}
 
-	for event := range events {
-		var result any
-		switch event.Type {
-		case agent.EventTextDelta:
-			result = map[string]any{"type": "text_delta", "text": event.Text}
-		case agent.EventToolCallStart:
-			result = map[string]any{"type": "tool_call_start", "tool": event.ToolCall.Name, "id": event.ToolCall.ID, "input": event.ToolCall.Input}
-		case agent.EventToolResult:
-			result = map[string]any{"type": "tool_result", "tool": event.ToolCall.Name, "id": event.ToolCall.ID, "input": event.ToolCall.Input, "output": event.Result.Output, "error": event.Result.Error}
-		case agent.EventDone:
-			result = map[string]any{"type": "done"}
-		case agent.EventError:
-			result = map[string]any{"type": "error", "message": event.Error.Error()}
-		case agent.EventAborted:
-			result = map[string]any{"type": "aborted"}
+	// Stream events in a goroutine so the WebSocket read loop stays free
+	// to process chat.abort messages.
+	go func() {
+		defer func() {
+			runCancel()
+			h.mu.Lock()
+			delete(h.activeRuns, conn)
+			h.mu.Unlock()
+		}()
+
+		for event := range events {
+			var result any
+			switch event.Type {
+			case agent.EventTextDelta:
+				result = map[string]any{"type": "text_delta", "text": event.Text}
+			case agent.EventToolCallStart:
+				result = map[string]any{"type": "tool_call_start", "tool": event.ToolCall.Name, "id": event.ToolCall.ID, "input": event.ToolCall.Input}
+			case agent.EventToolResult:
+				result = map[string]any{"type": "tool_result", "tool": event.ToolCall.Name, "id": event.ToolCall.ID, "input": event.ToolCall.Input, "output": event.Result.Output, "error": event.Result.Error}
+			case agent.EventDone:
+				result = map[string]any{"type": "done"}
+			case agent.EventError:
+				result = map[string]any{"type": "error", "message": event.Error.Error()}
+			case agent.EventAborted:
+				result = map[string]any{"type": "aborted"}
+			}
+			writeJSON(conn, JSONRPCResponse{
+				JSONRPC: "2.0",
+				Result:  result,
+				ID:      req.ID,
+			})
 		}
-		writeJSON(conn, JSONRPCResponse{
-			JSONRPC: "2.0",
-			Result:  result,
-			ID:      req.ID,
-		})
-	}
+	}()
 }
 
 func (h *WebSocketHandler) handleChatAbort(conn *websocket.Conn, req JSONRPCRequest) {

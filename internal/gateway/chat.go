@@ -200,6 +200,27 @@ html.light #header .logo {
 	margin: 0.5em 0 0.5em 1.5em;
 }
 .msg.assistant .content li { margin-bottom: 0.25em; }
+.msg.assistant .content table {
+	border-collapse: collapse;
+	margin: 0.5em 0;
+	display: block;
+	overflow-x: auto;
+	max-width: 100%%;
+}
+.msg.assistant .content th,
+.msg.assistant .content td {
+	border: 1px solid var(--border);
+	padding: 0.4em 0.75em;
+	text-align: left;
+}
+.msg.assistant .content th {
+	background: var(--bg-code);
+	color: var(--text-strong);
+	font-weight: 600;
+}
+.msg.assistant .content tr:nth-child(even) td {
+	background: rgba(128,128,128,0.07);
+}
 .tool-call {
 	background: var(--bg-code);
 	border: 1px solid var(--border);
@@ -471,6 +492,48 @@ html.light #header .logo {
 				if (!inOl) { html += '<ol>'; inOl = true; }
 				html += '<li>' + inlineMd(om[1]) + '</li>';
 				continue;
+			}
+
+			// Table: line starts with | and next line is a separator row
+			if (t.charAt(0) === '|' && i + 1 < lines.length) {
+				var sepLine = lines[i + 1].trim();
+				if (/^\|[\s\-:]+(\|[\s\-:]+)+\|?\s*$/.test(sepLine)) {
+					closeAll();
+					// Parse alignment from separator
+					var sepCells = sepLine.replace(/^\||\|$/g, '').split('|');
+					var aligns = [];
+					for (var a = 0; a < sepCells.length; a++) {
+						var sc = sepCells[a].trim();
+						if (sc.charAt(0) === ':' && sc.charAt(sc.length - 1) === ':') aligns.push('center');
+						else if (sc.charAt(sc.length - 1) === ':') aligns.push('right');
+						else aligns.push('left');
+					}
+					// Parse header row
+					var hdrs = t.replace(/^\||\|$/g, '').split('|');
+					var tbl = '<table><thead><tr>';
+					for (var h = 0; h < hdrs.length; h++) {
+						var al = aligns[h] || 'left';
+						tbl += '<th style="text-align:' + al + '">' + inlineMd(hdrs[h].trim()) + '</th>';
+					}
+					tbl += '</tr></thead><tbody>';
+					// Skip separator line
+					i += 2;
+					// Parse body rows
+					while (i < lines.length && lines[i].trim().charAt(0) === '|') {
+						var cells = lines[i].trim().replace(/^\||\|$/g, '').split('|');
+						tbl += '<tr>';
+						for (var c = 0; c < cells.length; c++) {
+							var cal = aligns[c] || 'left';
+							tbl += '<td style="text-align:' + cal + '">' + inlineMd(cells[c].trim()) + '</td>';
+						}
+						tbl += '</tr>';
+						i++;
+					}
+					tbl += '</tbody></table>';
+					html += tbl;
+					i--; // compensate for loop increment
+					continue;
+				}
 			}
 
 			// Regular text — close any open list first

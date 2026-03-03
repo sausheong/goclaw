@@ -122,7 +122,7 @@ The app serves a chat page at `http://localhost:18789/chat` (also accessible at 
 - Streaming responses via WebSocket
 - Light/dark mode toggle (persisted in browser)
 - Inline tool call display with collapsible output
-- Markdown rendering (headings, code blocks, lists, horizontal rules, bold, italic, links)
+- Markdown rendering (headings, code blocks, tables, lists, horizontal rules, bold, italic, links)
 
 ### Environment variables
 
@@ -354,7 +354,7 @@ Ten built-in tools that agents can use:
 | `bash` | Execute shell commands |
 | `web_fetch` | Fetch a URL and return its content |
 | `web_search` | Search the web |
-| `browser` | Headless Chrome automation (navigate, click, type, screenshot, evaluate JS) |
+| `browser` | Headless Chrome automation (navigate, click, type, screenshot, evaluate JS). All actions accept an optional `url` to navigate before acting |
 | `send_message` | Send a message to a user/group on any connected channel |
 | `cron` | Dynamically schedule, list, pause, resume, remove, and update recurring tasks |
 | `ask_agent` | Delegate a task to another agent and get back the result |

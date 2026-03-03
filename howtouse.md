@@ -1029,26 +1029,28 @@ The `browser` tool gives agents headless Chrome automation capabilities — navi
 
 | Action | Description |
 |--------|-------------|
-| `navigate` | Navigate to a URL |
-| `click` | Click an element by CSS selector |
-| `type` | Type text into an input by CSS selector |
-| `get_text` | Extract text content from an element by CSS selector |
-| `screenshot` | Take a screenshot (returns base64 PNG) |
-| `evaluate` | Run arbitrary JavaScript and return the result |
+| `navigate` | Navigate to a URL. Requires `url` |
+| `click` | Click an element by CSS selector. Optional `url` to navigate first |
+| `type` | Type text into an input by CSS selector. Optional `url` to navigate first |
+| `get_text` | Extract text content from an element or full page. Optional `url` to navigate first |
+| `screenshot` | Take a screenshot. Optional `url` to navigate first |
+| `evaluate` | Run arbitrary JavaScript and return the result. Optional `url` to navigate first |
+
+All actions except `navigate` accept an optional `url` parameter. When provided, the browser navigates to that URL before performing the action. This lets you fetch page content, take screenshots, or interact with elements in a single tool call without a separate `navigate` step.
 
 ### Example conversation
 
 ```
 You: Go to https://news.ycombinator.com and get the title of the top story.
-Agent: [uses browser tool: navigate to URL, then get_text on the first story element]
+Agent: [uses browser tool: get_text with url="https://news.ycombinator.com", selector=".titleline"]
        The top story is: "Show HN: GoClaw — self-hosted AI agent gateway in Go"
 
 You: Take a screenshot of that page.
-Agent: [uses browser tool: screenshot action]
+Agent: [uses browser tool: screenshot with url="https://news.ycombinator.com"]
        Here's the screenshot of the Hacker News front page.
 
 You: Click on the "new" link at the top.
-Agent: [uses browser tool: click on a.new]
+Agent: [uses browser tool: click with url="https://news.ycombinator.com", selector="a.new"]
        Done. I've navigated to the newest submissions page.
 ```
 
@@ -1316,7 +1318,7 @@ Each agent can have its own tool allow/deny list, controlling what actions it ca
 | `bash` | Execute shell commands |
 | `web_fetch` | Fetch a URL and return its content |
 | `web_search` | Search the web |
-| `browser` | Headless Chrome automation (navigate, click, type, screenshot, evaluate JS) |
+| `browser` | Headless Chrome automation (navigate, click, type, screenshot, evaluate JS). All actions accept an optional `url` to navigate before acting |
 | `send_message` | Send a message to a user/group on any connected channel |
 | `cron` | Dynamically schedule, list, pause, resume, remove, and update recurring tasks |
 | `ask_agent` | Delegate a task to another agent and get back the result |

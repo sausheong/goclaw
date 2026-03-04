@@ -121,6 +121,7 @@ func onReady() {
 	mJobs := systray.AddMenuItem("Jobs", "Open jobs in browser")
 	mLogs := systray.AddMenuItem("Logs", "Open logs in browser")
 	mSettings := systray.AddMenuItem("Settings", "Open config file")
+	mRestart := systray.AddMenuItem("Restart", "Restart the gateway")
 	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Quit", "Shut down and exit")
 
@@ -135,6 +136,32 @@ func onReady() {
 				openURL("http://localhost:" + itoa(port) + "/logs")
 			case <-mSettings.ClickedCh:
 				openFile(config.DefaultConfigPath())
+			case <-mRestart.ClickedCh:
+				slog.Info("restarting gateway")
+				result.Cleanup()
+				newResult, err := startup.StartGateway("", version, startup.Options{
+					ConnectTimeout: 30 * time.Second,
+				})
+				if err != nil {
+					slog.Error("failed to restart gateway", "error", err)
+					continue
+				}
+				go func() {
+					defer func() {
+						if r := recover(); r != nil {
+							slog.Error("panic in gateway server", "error", r)
+						}
+					}()
+					if err := newResult.Server.Start(); err != nil && err != http.ErrServerClosed {
+						slog.Error("gateway error", "error", err)
+					}
+				}()
+				result = newResult
+				port = newResult.Config.Gateway.Port
+				if port == 0 {
+					port = 18789
+				}
+				slog.Info("gateway restarted", "port", port)
 			case <-mQuit.ClickedCh:
 				result.Cleanup()
 				systray.Quit()

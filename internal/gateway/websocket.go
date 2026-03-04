@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -279,7 +280,18 @@ func (h *WebSocketHandler) handleChatSend(conn *websocket.Conn, req JSONRPCReque
 			case agent.EventToolCallStart:
 				result = map[string]any{"type": "tool_call_start", "tool": event.ToolCall.Name, "id": event.ToolCall.ID, "input": event.ToolCall.Input}
 			case agent.EventToolResult:
-				result = map[string]any{"type": "tool_result", "tool": event.ToolCall.Name, "id": event.ToolCall.ID, "input": event.ToolCall.Input, "output": event.Result.Output, "error": event.Result.Error}
+				r := map[string]any{"type": "tool_result", "tool": event.ToolCall.Name, "id": event.ToolCall.ID, "input": event.ToolCall.Input, "output": event.Result.Output, "error": event.Result.Error}
+				if len(event.Result.Images) > 0 {
+					var imgs []map[string]string
+					for _, img := range event.Result.Images {
+						imgs = append(imgs, map[string]string{
+							"mimeType": img.MimeType,
+							"data":     base64.StdEncoding.EncodeToString(img.Data),
+						})
+					}
+					r["images"] = imgs
+				}
+				result = r
 			case agent.EventDone:
 				result = map[string]any{"type": "done"}
 			case agent.EventError:
@@ -397,12 +409,23 @@ func (h *WebSocketHandler) handleSessionHistory(conn *websocket.Conn, req JSONRP
 			if err := json.Unmarshal(entry.Data, &tr); err != nil {
 				continue
 			}
-			entries = append(entries, map[string]any{
+			e := map[string]any{
 				"type":         "tool_result",
 				"tool_call_id": tr.ToolCallID,
 				"output":       tr.Output,
 				"error":        tr.Error,
-			})
+			}
+			if len(tr.Images) > 0 {
+				var imgs []map[string]string
+				for _, img := range tr.Images {
+					imgs = append(imgs, map[string]string{
+						"mimeType": img.MimeType,
+						"data":     img.Data, // already base64
+					})
+				}
+				e["images"] = imgs
+			}
+			entries = append(entries, e)
 		case session.EntryTypeMeta:
 			// Skip compaction summaries — internal
 		}

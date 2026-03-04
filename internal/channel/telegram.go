@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -136,21 +137,37 @@ func (t *TelegramChannel) Send(ctx context.Context, msg OutboundMessage) error {
 		return fmt.Errorf("invalid chat ID %q: %w", msg.ChatID, err)
 	}
 
-	// Split long messages
-	chunks := splitMessage(msg.Text, telegramMaxMessageLength)
+	text := msg.Text
+	parseMode := msg.ParseMode
+	if parseMode == "" {
+		text = markdownToTelegramHTML(msg.Text)
+		parseMode = "HTML"
+	}
+
+	if err := t.sendChunked(ctx, b, chatID, text, parseMode); err != nil {
+		if parseMode == "HTML" && msg.ParseMode == "" {
+			slog.Warn("telegram HTML send failed, retrying as plain text", "error", err)
+			return t.sendChunked(ctx, b, chatID, msg.Text, "")
+		}
+		return err
+	}
+	return nil
+}
+
+func (t *TelegramChannel) sendChunked(ctx context.Context, b *bot.Bot, chatID int64, text, parseMode string) error {
+	chunks := splitMessage(text, telegramMaxMessageLength)
 	for _, chunk := range chunks {
 		params := &bot.SendMessageParams{
 			ChatID: chatID,
 			Text:   chunk,
 		}
-		if msg.ParseMode != "" {
-			params.ParseMode = models.ParseMode(msg.ParseMode)
+		if parseMode != "" {
+			params.ParseMode = models.ParseMode(parseMode)
 		}
 		if _, err := b.SendMessage(ctx, params); err != nil {
 			return fmt.Errorf("telegram send: %w", err)
 		}
 	}
-
 	return nil
 }
 
@@ -409,4 +426,155 @@ func splitMessage(text string, maxLen int) []string {
 	}
 
 	return chunks
+}
+
+// escapeTelegramHTML escapes only the three characters that Telegram's HTML
+// parser requires: &, <, >. Unlike html.EscapeString it does NOT escape
+// quotes (' ") which Telegram does not support as named/numeric entities.
+func escapeTelegramHTML(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	return s
+}
+
+// Compiled regexes for inline markdown formatting.
+var (
+	reLink   = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+	reBold   = regexp.MustCompile(`\*\*(.+?)\*\*`)
+	reItalic = regexp.MustCompile(`\*([^*]+?)\*`)
+	reStrike = regexp.MustCompile(`~~(.+?)~~`)
+)
+
+// markdownToTelegramHTML converts standard markdown to Telegram-compatible HTML.
+func markdownToTelegramHTML(md string) string {
+	var out strings.Builder
+	lines := strings.Split(md, "\n")
+	inCode := false
+	var codeBuf strings.Builder
+	inQuote := false
+
+	for i, line := range lines {
+		// Code block fences
+		if strings.HasPrefix(line, "```") {
+			if inQuote {
+				out.WriteString("</blockquote>")
+				inQuote = false
+			}
+			if !inCode {
+				inCode = true
+				codeBuf.Reset()
+			} else {
+				inCode = false
+				out.WriteString("<pre>")
+				out.WriteString(escapeTelegramHTML(codeBuf.String()))
+				out.WriteString("</pre>")
+			}
+			if i < len(lines)-1 {
+				out.WriteString("\n")
+			}
+			continue
+		}
+		if inCode {
+			if codeBuf.Len() > 0 {
+				codeBuf.WriteString("\n")
+			}
+			codeBuf.WriteString(line)
+			continue
+		}
+
+		// Blockquotes
+		if strings.HasPrefix(line, "> ") || line == ">" {
+			content := strings.TrimPrefix(line, "> ")
+			content = strings.TrimPrefix(content, ">")
+			if !inQuote {
+				out.WriteString("<blockquote>")
+				inQuote = true
+			} else {
+				out.WriteString("\n")
+			}
+			out.WriteString(formatInline(content))
+			continue
+		}
+		if inQuote {
+			out.WriteString("</blockquote>\n")
+			inQuote = false
+		}
+
+		// Headers → bold
+		if len(line) > 2 && line[0] == '#' {
+			trimmed := strings.TrimLeft(line, "#")
+			if len(trimmed) > 0 && trimmed[0] == ' ' {
+				out.WriteString("<b>")
+				out.WriteString(formatInline(strings.TrimLeft(trimmed, " ")))
+				out.WriteString("</b>")
+				if i < len(lines)-1 {
+					out.WriteString("\n")
+				}
+				continue
+			}
+		}
+
+		// Bullet lists: "- item" → "• item"
+		trimmed := strings.TrimLeft(line, " \t")
+		if strings.HasPrefix(trimmed, "- ") {
+			indent := line[:len(line)-len(trimmed)]
+			out.WriteString(indent)
+			out.WriteString("• ")
+			out.WriteString(formatInline(trimmed[2:]))
+			if i < len(lines)-1 {
+				out.WriteString("\n")
+			}
+			continue
+		}
+
+		// Regular line
+		out.WriteString(formatInline(line))
+		if i < len(lines)-1 {
+			out.WriteString("\n")
+		}
+	}
+
+	if inQuote {
+		out.WriteString("</blockquote>")
+	}
+	if inCode {
+		out.WriteString("<pre>")
+		out.WriteString(escapeTelegramHTML(codeBuf.String()))
+		out.WriteString("</pre>")
+	}
+
+	return out.String()
+}
+
+// formatInline converts inline markdown (bold, italic, code, links) to HTML.
+func formatInline(text string) string {
+	// Split by backtick to isolate inline code spans
+	parts := strings.Split(text, "`")
+
+	// Odd number of backticks means unclosed code span; treat last backtick as literal
+	if len(parts)%2 == 0 {
+		parts[len(parts)-2] += "`" + parts[len(parts)-1]
+		parts = parts[:len(parts)-1]
+	}
+
+	var out strings.Builder
+	for i, part := range parts {
+		if i%2 == 1 {
+			// Inside inline code — escape HTML only
+			out.WriteString("<code>")
+			out.WriteString(escapeTelegramHTML(part))
+			out.WriteString("</code>")
+		} else {
+			// Regular text — escape HTML then apply formatting
+			s := escapeTelegramHTML(part)
+			s = reLink.ReplaceAllString(s, `<a href="$2">$1</a>`)
+			s = reBold.ReplaceAllString(s, "<b>$1</b>")
+			s = reItalic.ReplaceAllString(s, "<i>$1</i>")
+			s = reStrike.ReplaceAllString(s, "<s>$1</s>")
+			out.WriteString(s)
+		}
+	}
+
+	return out.String()
 }

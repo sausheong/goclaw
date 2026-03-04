@@ -258,6 +258,15 @@ html.light #header .logo {
 }
 .tool-call-output.show { display: block; }
 .tool-call-output.error { color: var(--error); }
+.tool-call-output img {
+	display: block;
+	max-width: 100%%;
+	max-height: 500px;
+	border-radius: 6px;
+	margin-top: 0.5rem;
+	cursor: pointer;
+}
+.tool-call-output.has-image { max-height: none; }
 .tool-call-header .tool-detail {
 	color: var(--text-muted);
 	font-family: "SF Mono", "Fira Code", monospace;
@@ -648,7 +657,7 @@ html.light #header .logo {
 						} else if (entry.type === 'tool_call') {
 							addToolCall(entry.tool, entry.id, entry.input);
 						} else if (entry.type === 'tool_result') {
-							updateToolResult(null, entry.tool_call_id, null, entry.output, entry.error);
+							updateToolResult(null, entry.tool_call_id, null, entry.output, entry.error, entry.images);
 						}
 					}
 					scrollToBottom();
@@ -672,7 +681,7 @@ html.light #header .logo {
 					addToolCall(r.tool, r.id, r.input);
 					break;
 				case 'tool_result':
-					updateToolResult(r.tool, r.id, r.input, r.output, r.error);
+					updateToolResult(r.tool, r.id, r.input, r.output, r.error, r.images);
 					break;
 				case 'done':
 					if (currentAssistant) {
@@ -807,7 +816,7 @@ html.light #header .logo {
 		scrollToBottom();
 	}
 
-	function updateToolResult(toolName, toolId, input, outputText, errorText) {
+	function updateToolResult(toolName, toolId, input, outputText, errorText, images) {
 		var el = toolEls[toolId] || toolEls[toolName];
 		if (!el) return;
 
@@ -836,6 +845,24 @@ html.light #header .logo {
 			output.textContent = display;
 		} else {
 			output.textContent = '(no output)';
+		}
+
+		// Render images (e.g. browser screenshots)
+		if (images && images.length > 0) {
+			output.classList.add('has-image');
+			for (var i = 0; i < images.length; i++) {
+				var img = document.createElement('img');
+				img.src = 'data:' + images[i].mimeType + ';base64,' + images[i].data;
+				img.title = 'Click to open full size';
+				img.onclick = (function(src) {
+					return function() { window.open(src, '_blank'); };
+				})(img.src);
+				output.appendChild(img);
+			}
+			// Auto-expand to show the image
+			output.classList.add('show');
+			var arrow = el.querySelector('.arrow');
+			if (arrow) arrow.classList.add('open');
 		}
 	}
 

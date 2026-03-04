@@ -1129,7 +1129,7 @@ func runOnboard() error {
 		return fmt.Errorf("marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, configJSON, 0o644); err != nil {
+	if err := os.WriteFile(configPath, configJSON, 0o600); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 	fmt.Printf("Config written to %s\n", configPath)

@@ -63,9 +63,7 @@ func validateURLNotInternal(rawURL string) error {
 	// Resolve hostname to IP addresses
 	ips, err := net.LookupIP(host)
 	if err != nil {
-		// If DNS resolution fails, allow the request — it will fail naturally.
-		// This avoids blocking legitimate URLs when DNS is temporarily unreachable.
-		return nil
+		return fmt.Errorf("cannot resolve hostname %q — blocking to prevent SSRF", host)
 	}
 
 	for _, ip := range ips {

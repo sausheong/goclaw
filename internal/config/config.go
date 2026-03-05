@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -174,6 +175,19 @@ func Load(path string) (*Config, error) {
 			return cfg, nil
 		}
 		return nil, fmt.Errorf("read config: %w", err)
+	}
+
+	// Warn if config file is readable by group or others (may expose API keys)
+	if info, statErr := os.Stat(path); statErr == nil {
+		mode := info.Mode().Perm()
+		if mode&0o077 != 0 {
+			slog.Warn("config file has overly permissive permissions",
+				"path", path,
+				"mode", fmt.Sprintf("%04o", mode),
+				"recommended", "0600",
+				"fix", fmt.Sprintf("chmod 600 %s", path),
+			)
+		}
 	}
 
 	// Strip JSON5 features (single-line comments, trailing commas) for stdlib JSON parsing.

@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"crypto/subtle"
 	"net/http"
 	"strings"
 )
@@ -34,7 +35,7 @@ func BearerAuthMiddleware(token string) func(http.Handler) http.Handler {
 			}
 
 			providedToken := strings.TrimPrefix(auth, "Bearer ")
-			if providedToken != token {
+			if subtle.ConstantTimeCompare([]byte(providedToken), []byte(token)) != 1 {
 				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 				return
 			}

@@ -59,9 +59,7 @@ func NewWebSocketHandler(
 		config:       cfg,
 		activeRuns:   make(map[*websocket.Conn]context.CancelFunc),
 		upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool {
-				return true // default; overridden by SetOriginChecker
-			},
+			CheckOrigin: AllowedOrigins(nil), // default: localhost-only; overridden by SetOriginChecker
 		},
 	}
 }

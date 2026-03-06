@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	_ "embed"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -28,7 +29,8 @@ var (
 )
 
 func main() {
-	// Write logs to a file so crashes are diagnosable (macOS .app has no stderr).
+	// Write logs to a file so crashes are diagnosable (macOS .app has no stderr,
+	// Windows GUI apps have no console).
 	initLogFile()
 
 	// macOS .app bundles don't inherit shell env vars (e.g. API keys).
@@ -83,11 +85,16 @@ func onReady() {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("panic in onReady", "error", r)
+			showError(fmt.Sprintf("GoClaw crashed: %v", r))
 			systray.Quit()
 		}
 	}()
 
-	systray.SetTemplateIcon(iconBytes, iconBytes)
+	if runtime.GOOS == "darwin" {
+		systray.SetTemplateIcon(iconBytes, iconBytes)
+	} else {
+		systray.SetIcon(iconBytes)
+	}
 	systray.SetTooltip("GoClaw")
 
 	// Start gateway in the background
@@ -96,6 +103,7 @@ func onReady() {
 	})
 	if err != nil {
 		slog.Error("failed to start gateway", "error", err)
+		showError(fmt.Sprintf("GoClaw failed to start:\n\n%v\n\nCheck config at:\n%s", err, config.DefaultConfigPath()))
 		systray.Quit()
 		return
 	}
@@ -183,7 +191,8 @@ func openURL(url string) {
 	case "linux":
 		cmd = exec.Command("xdg-open", url)
 	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", url)
+		// Use rundll32 to avoid cmd /c start title-parsing issues with URLs
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
 	default:
 		slog.Warn("unsupported OS for opening URL", "os", runtime.GOOS)
 		return
@@ -201,7 +210,7 @@ func openFile(path string) {
 	case "linux":
 		cmd = exec.Command("xdg-open", path)
 	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", path)
+		cmd = exec.Command("cmd", "/c", "start", "", path)
 	default:
 		slog.Warn("unsupported OS for opening file", "os", runtime.GOOS)
 		return

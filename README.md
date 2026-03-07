@@ -219,12 +219,13 @@ All configuration lives in `~/.goclaw/goclaw.json5` (JSON5 format for comments a
 
 ### LLM Providers
 
-GoClaw supports three provider kinds. Each provider is defined in the `providers` section of the config with a unique name, a `kind`, and connection details.
+GoClaw supports four provider kinds. Each provider is defined in the `providers` section of the config with a unique name, a `kind`, and connection details.
 
 | Kind | Description | Requires |
 |------|-------------|----------|
 | `anthropic` | Anthropic's Claude API | `api_key` |
 | `openai` | OpenAI's API (GPT models) | `api_key` |
+| `gemini` | Google's Gemini API | `api_key` |
 | `openai-compatible` | Any OpenAI-compatible API (Ollama, LM Studio, DeepSeek, LiteLLM, etc.) | `base_url`, optionally `api_key` |
 
 **Standard providers (Anthropic, OpenAI):**
@@ -239,6 +240,10 @@ GoClaw supports three provider kinds. Each provider is defined in the `providers
     "openai": {
       "kind": "openai",
       "api_key": "sk-proj-..."
+    },
+    "gemini": {
+      "kind": "gemini",
+      "api_key": "AIza..."
     }
   }
 }
@@ -270,13 +275,6 @@ Any service exposing an OpenAI-compatible API (e.g., `/v1/chat/completions`) wor
       "base_url": "https://api.deepseek.com/v1"
     },
 
-    // Google Gemini — via OpenAI-compatible endpoint
-    "gemini": {
-      "kind": "openai-compatible",
-      "api_key": "AIza...",
-      "base_url": "https://generativelanguage.googleapis.com/v1beta/openai"
-    },
-
     // LiteLLM — proxy for multiple providers
     "litellm": {
       "kind": "openai-compatible",
@@ -295,7 +293,7 @@ Agents reference models as `provider/model-name`, where the provider name matche
 "model": "openai/gpt-4o"                          // OpenAI GPT-4o
 "model": "ollama/llama3"                           // Ollama local model
 "model": "deepseek/deepseek-chat"                  // DeepSeek
-"model": "gemini/gemini-2.0-flash"                 // Google Gemini
+"model": "gemini/gemini-2.5-flash"                 // Google Gemini
 "model": "lmstudio/qwen2.5-coder-14b"             // LM Studio local model
 ```
 
@@ -491,7 +489,7 @@ make help                   # Show all targets
 | Telegram | `github.com/go-telegram/bot` |
 | WhatsApp | `go.mau.fi/whatsmeow` |
 | OpenAI client | `github.com/sashabaranov/go-openai` |
-| Gemini client | `github.com/google/generative-ai-go` |
+| Gemini client | `google.golang.org/genai` |
 | Vector DB | `github.com/philippgille/chromem-go` |
 | File watching | `github.com/fsnotify/fsnotify` |
 | Browser automation | `github.com/chromedp/chromedp` |

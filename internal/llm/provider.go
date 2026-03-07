@@ -124,6 +124,8 @@ func NewProvider(providerName string, opts ProviderOptions) (LLMProvider, error)
 		return NewAnthropicProvider(opts.APIKey, opts.BaseURL), nil
 	case "openai", "openai-compatible":
 		return NewOpenAIProvider(opts.APIKey, opts.BaseURL), nil
+	case "gemini":
+		return NewGeminiProvider(context.Background(), opts.APIKey)
 	default:
 		return nil, fmt.Errorf("unknown LLM provider kind: %q", kind)
 	}

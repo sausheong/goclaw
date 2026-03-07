@@ -273,7 +273,8 @@ GoClaw supports multiple LLM providers simultaneously. Each provider is defined 
 |------|-------------|---------|
 | `anthropic` | Anthropic's native API (custom SSE streaming) | Claude models |
 | `openai` | OpenAI's native API | GPT models |
-| `openai-compatible` | Any API that implements the OpenAI chat completions spec | Ollama, LM Studio, DeepSeek, Google Gemini, LiteLLM, vLLM, and more |
+| `gemini` | Google's Gemini API (native SDK) | Gemini models |
+| `openai-compatible` | Any API that implements the OpenAI chat completions spec | Ollama, LM Studio, DeepSeek, LiteLLM, vLLM, and more |
 
 ### Provider config fields
 
@@ -469,7 +470,7 @@ Available models: `deepseek-chat`, `deepseek-coder`, `deepseek-reasoner`.
 
 #### Google Gemini
 
-Google Gemini can be used via its [OpenAI-compatible endpoint](https://ai.google.dev/gemini-api/docs/openai).
+GoClaw has a native Gemini provider using the official Google GenAI SDK.
 
 1. Get an API key from [aistudio.google.com](https://aistudio.google.com/apikey)
 2. Add to your config:
@@ -478,9 +479,8 @@ Google Gemini can be used via its [OpenAI-compatible endpoint](https://ai.google
 {
   "providers": {
     "gemini": {
-      "kind": "openai-compatible",
-      "api_key": "AIza...",
-      "base_url": "https://generativelanguage.googleapis.com/v1beta/openai"
+      "kind": "gemini",
+      "api_key": "AIza..."
     }
   }
 }
@@ -490,7 +490,6 @@ Or set via environment variables:
 
 ```bash
 export GEMINI_API_KEY="AIza..."
-export GEMINI_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai"
 ```
 
 Example agent config:
@@ -498,11 +497,11 @@ Example agent config:
 ```json5
 {
   "id": "default",
-  "model": "gemini/gemini-2.0-flash"
+  "model": "gemini/gemini-2.5-flash"
 }
 ```
 
-Available models: `gemini-2.0-flash`, `gemini-2.0-flash-lite`, `gemini-1.5-pro`, `gemini-1.5-flash`.
+Available models: `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-2.0-flash`.
 
 #### LiteLLM / Other proxies
 
@@ -528,7 +527,7 @@ anthropic/claude-sonnet-4-5-20250514    → uses the "anthropic" provider
 openai/gpt-4o                          → uses the "openai" provider
 ollama/llama3                           → uses the "ollama" provider
 deepseek/deepseek-chat                  → uses the "deepseek" provider
-gemini/gemini-2.0-flash                 → uses the "gemini" provider
+gemini/gemini-2.5-flash                 → uses the "gemini" provider
 lmstudio/qwen2.5-coder-14b             → uses the "lmstudio" provider
 ```
 

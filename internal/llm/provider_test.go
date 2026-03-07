@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -115,5 +116,25 @@ func TestOpenAIProviderModels(t *testing.T) {
 		assert.NotEmpty(t, m.ID)
 		assert.NotEmpty(t, m.Name)
 		assert.Equal(t, "openai", m.Provider)
+	}
+}
+
+func TestNewProviderGemini(t *testing.T) {
+	p, err := NewProvider("gemini", ProviderOptions{APIKey: "test-key", Kind: "gemini"})
+	require.NoError(t, err)
+	assert.NotNil(t, p)
+	_, ok := p.(*GeminiProvider)
+	assert.True(t, ok, "expected *GeminiProvider")
+}
+
+func TestGeminiProviderModels(t *testing.T) {
+	p, err := NewGeminiProvider(context.Background(), "test-key")
+	require.NoError(t, err)
+	models := p.Models()
+	assert.NotEmpty(t, models)
+	for _, m := range models {
+		assert.NotEmpty(t, m.ID)
+		assert.NotEmpty(t, m.Name)
+		assert.Equal(t, "gemini", m.Provider)
 	}
 }

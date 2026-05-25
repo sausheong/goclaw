@@ -300,6 +300,8 @@ func StartGateway(configPath, version string, opts ...Options) (*Result, error) 
 	if cfg.Path() != "" {
 		watcher, err := config.NewWatcher(cfg.Path(), func(newCfg *config.Config) {
 			wsHandler.UpdateConfig(newCfg)
+			chanMgr.UpdateConfig(newCfg)
+			agentRunner.UpdateConfig(newCfg)
 			slog.Info("config hot-reloaded")
 		})
 		if err == nil {
@@ -466,6 +468,8 @@ func StartGateway(configPath, version string, opts ...Options) (*Result, error) 
 		JobsHandler:    gateway.NewJobsHandler(port),
 		Settings: gateway.NewSettingsHandlers(cfg, func(newCfg *config.Config) {
 			wsHandler.UpdateConfig(newCfg)
+			chanMgr.UpdateConfig(newCfg)
+			agentRunner.UpdateConfig(newCfg)
 			slog.Info("config updated via settings page")
 		}),
 		LogBuffer:      logBuf,

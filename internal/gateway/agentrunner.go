@@ -62,6 +62,11 @@ func (r *AgentRunnerImpl) SetCortex(cx *cortex.Cortex) {
 	r.cortex = cx
 }
 
+// UpdateConfig hot-reloads the config.
+func (r *AgentRunnerImpl) UpdateConfig(cfg *config.Config) {
+	r.config = cfg
+}
+
 // RunAgent delegates a task to the specified agent and returns the text response.
 func (r *AgentRunnerImpl) RunAgent(ctx context.Context, agentID, prompt string) (string, error) {
 	agentCfg, ok := r.config.GetAgent(agentID)

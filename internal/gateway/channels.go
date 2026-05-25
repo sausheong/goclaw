@@ -89,6 +89,13 @@ func (cm *ChannelManager) SetCortex(cx *cortex.Cortex) {
 	cm.cortex = cx
 }
 
+// UpdateConfig hot-reloads the config.
+func (cm *ChannelManager) UpdateConfig(cfg *config.Config) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	cm.config = cfg
+}
+
 // SetConnectTimeout sets a per-channel connect timeout. When non-zero,
 // channels that don't connect within this duration are skipped. Use this
 // for headless environments (e.g. menubar app) where interactive setup
